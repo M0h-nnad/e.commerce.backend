@@ -80,7 +80,7 @@ const createSubItem = async (req, res, next) => {
     req.body.cover = '/images/' + req.files.cover[0].filename;
   }
   const NewSubItem = await new SubItem(req.body);
-  NewSubItem.save((err) => {
+  NewSubItem.save(async (err) => {
     if (err) return next(err);
 
     try {
@@ -444,94 +444,94 @@ const deleteComment = async (req, res, next) => {
 
 /* Shop */
 
-// const CreateShop = async (req, res, next) => {
-//   try {
-//     const newShop = await new Shop(req.body);
-//     await newShop.save();
-//     return res
-//       .status(201)
-//       .send({ messages: 'Shop Created Successfully', newShop });
-//   } catch (err) {
-//     return next(err);
-//   }
-// };
+const CreateShop = async (req, res, next) => {
+  try {
+    const newShop = await new Shop(req.body);
+    await newShop.save();
+    return res
+      .status(201)
+      .send({ messages: 'Shop Created Successfully', newShop });
+  } catch (err) {
+    return next(err);
+  }
+};
 
-// const UpdateShop = async (req, res, next) => {
-//   try {
-//     const updatedShop = await Shop.findOneAndUpdate(
-//       { _id: req.body.id, owner: req.decToken.UserId },
-//       req.body,
-//       { new: true }
-//     );
-//     return res
-//       .status(200)
-//       .send({ messages: 'Shop Updated Successfully', updatedShop });
-//   } catch (err) {
-//     return next(err);
-//   }
-// };
+const UpdateShop = async (req, res, next) => {
+  try {
+    const updatedShop = await Shop.findOneAndUpdate(
+      { _id: req.body.id, owner: req.decToken.UserId },
+      req.body,
+      { new: true }
+    );
+    return res
+      .status(200)
+      .send({ messages: 'Shop Updated Successfully', updatedShop });
+  } catch (err) {
+    return next(err);
+  }
+};
 
-// const getShops = async (req, res, next) => {
-//   try {
-//     const Shops = await Shop.find({}).populate();
-//     return res
-//       .status(200)
-//       .send({ messages: 'Shops Fetched Successfully', Shops });
-//   } catch (err) {
-//     return next(err);
-//   }
-// };
+const getShops = async (req, res, next) => {
+  try {
+    const Shops = await Shop.find({}).populate();
+    return res
+      .status(200)
+      .send({ messages: 'Shops Fetched Successfully', Shops });
+  } catch (err) {
+    return next(err);
+  }
+};
 
-// const getShop = async (req, res, next) => {
-//   try {
-//     const shop = await Shop.findById(req.params.id);
-//     return res
-//       .status(200)
-//       .send({ messages: 'Shop Fetched Successfully', shop });
-//   } catch (err) {
-//     return next(err);
-//   }
-// };
+const getShop = async (req, res, next) => {
+  try {
+    const shop = await Shop.findById(req.params.id);
+    return res
+      .status(200)
+      .send({ messages: 'Shop Fetched Successfully', shop });
+  } catch (err) {
+    return next(err);
+  }
+};
 
-// const getUserShop = async (req, res, next) => {
-//   try {
-//     const shop = await Shop.find({
-//       _id: req.params.id,
-//       owner: rq.decToken.UserId,
-//     }).populate();
-//     return res
-//       .status(200)
-//       .send({ messages: 'Shops Fetched Successfully', shop });
-//   } catch (err) {
-//     return next(err);
-//   }
-// };
+const getUserShop = async (req, res, next) => {
+  try {
+    const shop = await Shop.find({
+      _id: req.params.id,
+      owner: rq.decToken.UserId,
+    }).populate();
+    return res
+      .status(200)
+      .send({ messages: 'Shops Fetched Successfully', shop });
+  } catch (err) {
+    return next(err);
+  }
+};
 
-// const getUserShops = async (req, res, next) => {
-//   try {
-//     const shops = await Shop.find({
-//       _id: req.params.id,
-//       owner: req.decToken.UserId,
-//     }).populate();
-//     return res
-//       .status(200)
-//       .send({ messages: 'Shops Fetched Successfully', shops });
-//   } catch (err) {
-//     return next(err);
-//   }
-// };
+const getUserShops = async (req, res, next) => {
+  try {
+    const shops = await Shop.find({
+      _id: req.params.id,
+      owner: req.decToken.UserId,
+    }).populate();
+    return res
+      .status(200)
+      .send({ messages: 'Shops Fetched Successfully', shops });
+  } catch (err) {
+    return next(err);
+  }
+};
 
-// const deleteShop = async (req, res, next) => {
-//   try {
-//     const deletedShop = await Shop.deleteOne({
-//       _id: req.params.id,
-//       owner: req.decToken.UserId,
-//     });
-//     res.status(200).send({ messages: 'Shop Deleted Successfully' });
-//   } catch (err) {
-//     return next(err);
-//   }
-// };
+const deleteShop = async (req, res, next) => {
+  try {
+    const deletedShop = await Shop.deleteOne({
+      _id: req.params.id,
+      owner: req.decToken.UserId,
+    });
+    res.status(200).send({ messages: 'Shop Deleted Successfully' });
+  } catch (err) {
+    return next(err);
+  }
+};
 
 module.exports = {
   items: {
@@ -569,13 +569,13 @@ module.exports = {
     deleteComment,
     updateComments,
   },
-  // shop: {
-  //   CreateShop,
-  //   UpdateShop,
-  //   deleteShop,
-  //   getUserShop,
-  //   getUserShops,
-  //   getShop,
-  //   getShops,
-  // },
+  shop: {
+    CreateShop,
+    UpdateShop,
+    deleteShop,
+    getUserShop,
+    getUserShops,
+    getShop,
+    getShops,
+  },
 };

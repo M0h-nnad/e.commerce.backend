@@ -1,8 +1,8 @@
-const OrderLine = require('../models/orderLine.model');
-const Order = require('../models/order.model');
-const SubItem = require('../models/subItem.model');
+const OrderLine = require("../models/orderLine.model");
+const Order = require("../models/order.model");
+const SubItem = require("../models/subItem.model");
 
-const bwipjs = require('bwip-js');
+const bwipjs = require("bwip-js");
 
 /* Order Line */
 
@@ -72,13 +72,13 @@ const CreateOrder = async (req, res, next) => {
     const newOrder = await new Order({ owner, status, address });
     bwipjs
       .toBuffer({
-        bcid: 'code128', // Barcode type
+        bcid: "code128", // Barcode type
         text: `http://localhost:3000/order/${newOrder._id}`, // Text to encode
         scale: 3, // 3x scaling factor
         height: 10, // Bar height, in millimeters
       })
       .then((png) => {
-        const buffer = new Buffer(png).toString('base64');
+        const buffer = new Buffer(png).toString("base64");
         barcode = buffer;
       })
       .catch((err) => {
@@ -89,43 +89,39 @@ const CreateOrder = async (req, res, next) => {
 
     /* Creating OrderLines */
 
-    req.body.orderLines.forEach((el) => {
+    req.body.orderLines.forEach(async (el) => {
       const newOrderLine = await new OrderLine(el);
-      bwipjs
-        .toBuffer({
-          bcid: 'code128', // Barcode type
-          text: `http://localhost:3000/order/${newOrderLine._id}`, // Text to encode
-          scale: 3, // 3x scaling factor
-          height: 10, // Bar height, in millimeters
-        })
-        .then((png) => {
-          const buffer = new Buffer(png).toString('base64');
-          barcode = buffer;
-        })
-        .catch((err) => {
-          next(err);
-        });
-      newOrderLine.barcode = barcode;
-      newOrderLine.barcodeText = `http://localhost:3000/order/${newOrderLine._id}`;
+      // bwipjs
+      //   .toBuffer({
+      //     bcid: "code128", // Barcode type
+      //     text: `http://localhost:3000/order/${newOrderLine._id}`, // Text to encode
+      //     scale: 3, // 3x scaling factor
+      //     height: 10, // Bar height, in millimeters
+      //   })
+      //   .then((png) => {
+      //     const buffer = new Buffer(png).toString("base64");
+      //     barcode = buffer;
+      //   })
+      //   .catch((err) => {
+      //     next(err);
+      //   });
+      // newOrderLine.barcode = barcode;
+      // newOrderLine.barcodeText = `http://localhost:3000/order/${newOrderLine._id}`;
       await newOrderLine.save();
       await Order.updateOne(
         { _id: newOrder._id },
         { $addToSet: { orderLines: newOrderLine._id } }
       );
-      await SubItem.findeOneAndUpdate(
-        { _id: item },
-        { $inc: { 'SubItem.count': -1 } },
-        { new: true }
-      );
+      await SubItem.updateOne({ _id: item }, { $inc: { "SubItem.count": -1 } });
     });
 
-    return res.status(201).send({ messages: 'Order Created Successfully' });
+    return res.status(201).send({ messages: "Order Created Successfully" });
   } catch (err) {
     return next(err);
   }
 };
 
-const getOrders = (req, res, next) => {
+const getOrders = async (req, res, next) => {
   try {
     const pageSize = +req.query.pageSize;
     const currentPage = +req.query.currentPage;
@@ -133,22 +129,22 @@ const getOrders = (req, res, next) => {
     const userId = req.decToken.UserId;
     if (pageSize && currentPage) {
       const Orders = await Order.find({})
-        .populate('ordreLines')
+        .populate("ordreLines")
         .skip(pageSize * (currentPage - 1))
         .limit(pageSize);
       return res
         .status(200)
-        .send({ messages: 'Orders Fetched Successfully', Orders });
+        .send({ messages: "Orders Fetched Successfully", Orders });
     } else if (orderId) {
-      const Orders = await Order.find({ _id: orderId }).populate('ordreLines');
+      const Orders = await Order.find({ _id: orderId }).populate("ordreLines");
       return res
         .status(200)
-        .send({ messages: 'Orders Fetched Successfully', Orders });
+        .send({ messages: "Orders Fetched Successfully", Orders });
     } else {
-      const Orders = await Order.find({ owner: userId }).populate('ordreLines');
+      const Orders = await Order.find({ owner: userId }).populate("ordreLines");
       return res
         .status(200)
-        .send({ messages: 'Orders Fetched Successfully', Orders });
+        .send({ messages: "Orders Fetched Successfully", Orders });
     }
   } catch (err) {
     return next(err);
@@ -166,13 +162,13 @@ const getOrders = (req, res, next) => {
 //   }
 // };
 
-const deleteOrder = (req, res, next) => {
+const deleteOrder = async (req, res, next) => {
   try {
     const Order = await Order.findeOneAndDelete({ owner: req.params.id });
     for (let line of Order.ordreLines) {
       await OrderLine.deleteOne({ _id: line });
     }
-    return res.status(200).send({ messages: 'Orders Deleted Successfully' });
+    return res.status(200).send({ messages: "Orders Deleted Successfully" });
   } catch (err) {
     return next(err);
   }

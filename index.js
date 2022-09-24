@@ -1,29 +1,29 @@
-require('dotenv').config();
-const mongoose = require('./middleware/mongo');
-const express = require('express');
-const bodyParser = require('body-parser');
+require("dotenv").config();
+const mongoose = require("./middleware/mongo");
+const express = require("express");
+const bodyParser = require("body-parser");
 const app = express();
-const UserRouter = require('./router/User.router');
-const errorMiddleWare = require('./middleware/error.middleware');
-const multer = require('multer');
-const path = require('path');
-const os = require('os');
-const fs = require('fs');
-const User = require('./models/User.model');
+const UserRouter = require("./router/User.router");
+const errorMiddleWare = require("./middleware/error.middleware");
+const multer = require("multer");
+const path = require("path");
+const os = require("os");
+const fs = require("fs");
+const User = require("./models/User.model");
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, 'images'));
+    cb(null, path.join(__dirname, "images"));
   },
   filename: (req, file, cb) => {
-    const name = file.originalname.toLowerCase().split(' ').join('-');
-    cb(null, name + '.' + '-' + new Date().toDateString().replace(/:/g, '-'));
+    const name = file.originalname.toLowerCase().split(" ").join("-");
+    cb(null, name + "." + "-" + new Date().toDateString().replace(/:/g, "-"));
   },
 });
 
 const upload = multer({ storage });
 
-app.use('/images', express.static('images'));
+app.use("/images", express.static("images"));
 
 // app.use("/c",express.static('../../../../Courses/Udemy/[FreeCourseSite.com] Udemy - React - The Complete Guide (incl Hooks, React Router, Redux)'))
 
@@ -103,7 +103,7 @@ app.use('/images', express.static('images'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
-app.use('/user', UserRouter);
+app.use("/user", UserRouter);
 
 app.use(errorMiddleWare);
 app.listen(process.env.port || 3000);
@@ -208,7 +208,7 @@ class recentItems {
 }
 
 class need {
-  User; // the Requester
+  user; // the Requester
   requestedCount;
 }
 
@@ -225,7 +225,7 @@ class orderLine {
 
 class order {
   owner;
-  status; // fullfilled
+  status; // fullfilled,
   barcode;
   address;
   addressAudit;

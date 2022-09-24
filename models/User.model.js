@@ -1,24 +1,28 @@
 const mongoose = require("mongoose");
 const UserSchema = new mongoose.Schema(
   {
-    firstName: { type: String, required: [true,'First Name Is Required'] },
-    lastName: { type: String, required: [true,"Last Name Is Required"] },
+    firstName: { type: String, required: [true, "First Name Is Required"] },
+    lastName: { type: String, required: [true, "Last Name Is Required"] },
     gender: {
       type: String,
       required: [true, "Gender Is Required"],
       enum: { values: ["Male", "female"], message: "{VALUE} is Not Supported" },
     },
-    role: { type: mongoose.Schema.Types.ObjectId , required: [true,"Role Is Required"], ref: "Role" },
+    role: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: [true, "Role Is Required"],
+      ref: "Role",
+    },
     email: {
       type: String,
       required: [true, "Email Is Required"],
       unique: [true],
     },
-    password: { type: String, required: [true,'PassWord Is Required'] },
+    password: { type: String, required: [true, "PassWord Is Required"] },
     enabled: { type: Boolean, default: false },
-    addresses: { type: [mongoose.Schema.Types.ObjectId] , ref:'Address'},
-   // operatorOrders:{type:[mongoose.Schema.Types.ObjectId],ref:'Orders'},
-   // orderNumbers:{type:Number,max:5}
+    addresses: { type: [mongoose.Schema.Types.ObjectId], ref: "Address" },
+    operatorOrders: { type: [mongoose.Schema.Types.ObjectId], ref: "Orders" },
+    // orderNumbers:{type:Number,max:5}
   },
   {
     timestamps: true,

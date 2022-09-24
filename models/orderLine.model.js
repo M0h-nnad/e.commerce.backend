@@ -22,6 +22,7 @@ const OrderLineSchema = new mongoose.Schema(
     //   type: mongoose.Schema.Types.ObjectId,
     //   ref: "SubItemAudit",
     // },
+    quantity: { type: Number, required: true },
     barcode: { type: Buffer, contentType: String },
     barcodeText: { type: String },
     deliveryIntructions: { type: String },

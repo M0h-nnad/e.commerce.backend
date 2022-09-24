@@ -22,10 +22,10 @@ const SubItemsSchema = new mongoose.Schema(
     count: { type: String, required: true },
     tags: { type: [String] },
     comments: [mongoose.Schema.Types.ObjectId],
-    offer: { type: mongoose.Schema.Types.ObjectId, ref: "offer" },
+    offer: { type: Number },
     rating: { type: Number, required: true, default: 0 },
     ratings: { type: [mongoose.Schema.Types.ObjectId], ref: "ratings" },
-    fabric: [String],
+    fabric: [FabricSchema],
     shop: {
       type: monogoose.Schema.Types.ObjectId,
       ref: "Shop",
