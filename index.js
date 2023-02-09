@@ -4,31 +4,23 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const app = express();
 const UserRouter = require('./router/User.router');
+const ItemsRouter = require('./router/item.router');
 const errorMiddleWare = require('./middleware/error.middleware');
-const multer = require('multer');
 const path = require('path');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-const storage = multer.diskStorage({
-	destination: (req, file, cb) => {
-		cb(null, path.join(__dirname, 'images'));
-	},
-	filename: (req, file, cb) => {
-		const name = file.originalname.toLowerCase().split(' ').join('-');
-		cb(null, name + '.' + '-' + new Date().toDateString().replace(/:/g, '-'));
-	},
-});
+// const upload = multer({ storage });
 
-const upload = multer({ storage });
-
-app.use('/images', express.static('images'));
+app.use('/images', express.static(path.join(process.cwd(), '..', 'images')));
 
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.urlencoded({ extended: true }));
 
-app.use('/user', UserRouter);
+app.use('/api', UserRouter);
+
+app.use('/api', ItemsRouter);
 
 app.use(errorMiddleWare);
+
 app.listen(process.env.port || 3000);
 
 class Person {

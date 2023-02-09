@@ -6,111 +6,113 @@ const Card = require('../models/cards.model');
 const Role = require('../models/role.model');
 const Favourite = require('../models/favourite.model');
 const Cart = require('../models/cart.model');
-
+const NotFoundException = require('../shared/error');
+const conn = require('../middleware/mongo');
 /* Third Parties */
 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const orderLineModel = require('../models/orderLine.model');
 const { Secret } = process.env;
 
 const signUp = async (req, res, next) => {
-  const { email, password, role } = req.body;
-  if (!email || !password)
-    return res.status(400).send({ messages: 'Invalid Credentials' });
-  req.body.password = await bcrypt.hash(req.body.password, 12);
-  try {
-    const newUser = await new User(req.body);
-    console.log(newUser);
-    const newCart = await new Cart({ owner: req.decToken.UserId });
-    const newFavourite = await new Favourite({
-      owner: req.decToken.UserId,
-      // items: [req.body.itemId],
-    });
-    if (req.body.itemId)
-      req.body.itemId.length
-        ? (newFavourite.items = [req.body.itemId])
-        : (newFavourite.items = req.body.itemId);
+	const { email, password, role } = req.body;
+	if (!email || !password) return res.status(400).send({ messages: 'Invalid Credentials' });
+	req.body.password = await bcrypt.hash(req.body.password, 12);
+	const session = await conn.startSession();
+	try {
+		const newUser = await new User(req.body);
 
-    await newFavourite.save();
-    awaitnewUser.save();
-    newUser.token = jwt.sign(
-      { UserId: newUser._id, email: newUser.email },
-      Secret,
-      {
-        expiresIn: '24h',
-      }
-    );
-    return res
-      .status(201)
-      .send({ messages: 'User Created Successfully', UserDoc: newUser });
-  } catch (err) {
-    return next(err);
-  }
+		const newCart = await new Cart({ owner: doc._id });
+		const newFavourite = await new Favourite({
+			owner: doc._id,
+		});
+
+		await newCart.save();
+		await newFavourite.save();
+
+		await newUser.save();
+		(await session).commitTransaction();
+		newUser.token = jwt.sign({ UserId: newUser._id, email: newUser.email }, Secret, {
+			expiresIn: '24h',
+		});
+		return res.status(201).send({ messages: 'User Created Successfully', UserDoc: newUser });
+	} catch (err) {
+		(await session).abortTransaction();
+		next(err);
+	}
+	session.endSession();
 };
 
 const logIn = async (req, res, next) => {
-  let { email, password } = req.body;
-  let UserDoc = await User.findOne({ email }).populate('addresses').lean();
-  if (UserDoc && (await bcrypt.compare(password, UserDoc.password))) {
-    UserDoc.token = jwt.sign(
-      { UserId: UserDoc._id, email: UserDoc.email },
-      Secret,
-      { expiresIn: '24h' }
-    );
-    delete UserDoc.password;
-    return res
-      .status(200)
-      .send({ messages: 'Logged In SuccessFully', UserDoc });
-  }
-  return res.status(404).send({ messages: 'Account Is not Found' });
+	let { email, password } = req.body;
+	let UserDoc = await User.findOne({ email }).populate('addresses').lean();
+	if (UserDoc && (await bcrypt.compare(password, UserDoc.password))) {
+		UserDoc.token = jwt.sign({ UserId: UserDoc._id, email: UserDoc.email }, Secret, {
+			expiresIn: '24h',
+		});
+		delete UserDoc.password;
+		return res.status(200).send({ messages: 'Logged In SuccessFully', UserDoc });
+	}
+	return res.status(404).send({ messages: 'Account Is not Found' });
 };
 
 const UpdateUser = async (req, res, next) => {
-  try {
-    const UpdatedUser = await User.findOneAndUpdate(
-      { _id: req.decToken.UserId },
-      req.body,
-      { new: true }
-    );
-    return res
-      .status(200)
-      .send({ messages: 'User Updated Successfully', UpdatedUser });
-  } catch (err) {
-    return next(err);
-  }
+	try {
+		const UpdatedUser = await User.findOneAndUpdate({ _id: req.decToken.UserId }, req.body, {
+			new: true,
+		});
+
+		if (!UpdatedUser) throw new NotFoundException('User Is Not Found');
+
+		res.status(200).send({ messages: 'User Updated Successfully', UpdatedUser });
+	} catch (err) {
+		next(err);
+	}
 };
 
 const UpdatePassword = async (req, res, next) => {
-  try {
-    const hashedPass = await bcrypt.hash(req.body.password, 12);
-    const UpdatedUser = await User.findOneAndUpdate(
-      { _id: req.decToken.UserId },
-      { password: hashedPass },
-      { new: true }
-    );
+	try {
+		const hashedPass = await bcrypt.hash(req.body.password, 12);
+		const UpdatedUser = await User.findOneAndUpdate(
+			{ _id: req.decToken.UserId },
+			{ password: hashedPass },
+			{ new: true },
+		);
 
-    return res.send(200).status({ messages: 'Password Updated Successfully' });
-  } catch (err) {
-    return next(err);
-  }
+		if (!UpdatedUser) throw new NotFoundException('User is not found');
+
+		return res.send(200).status({ messages: 'Password Updated Successfully' });
+	} catch (err) {
+		return next(err);
+	}
 };
 
 const DeleteUser = async (req, res, next) => {
-  try {
-    const DeleteUser = await User.findOneAndDelete({
-      _id: req.decToken.UserId,
-    });
-    const DeleteAddresses = await Address.deleteMany({
-      UserId: req.decToken.UserId,
-    });
-    const DeleteCards = await Card.findOneAndDelete({
-      owner: req.decToken.UserId,
-    });
-    const cart = await Cart.findByIdAndDelete({ owner: req.decToken.UserId });
-    return res.status(200).send({ messages: 'Deleted Successfully' });
-  } catch (err) {
-    return next(err);
-  }
+	const session = await conn.startSession();
+	try {
+		const DeleteUser = await User.findOneAndDelete({
+			_id: req.decToken.UserId,
+		});
+
+		const DeleteAddresses = await Address.deleteMany({
+			UserId: doc._id,
+		});
+		const DeleteCards = await Card.deleteMany({
+			owner: doc._id,
+		});
+
+		const cart = await Cart.deleteMany({ owner: doc._id });
+
+		await session.commitTransaction();
+		if (!DeleteUser) throw new NotFoundException('User is not found');
+
+		res.status(200).send({ messages: 'Deleted Successfully' });
+	} catch (err) {
+		next(err);
+		await session.abortTransaction();
+	}
+	session.endSession();
 };
 
 const restPassword = async (req, res, next) => {};
@@ -118,268 +120,298 @@ const restPassword = async (req, res, next) => {};
 /* Creating User Cards */
 
 const createCards = async (req, res, next) => {
-  const NewCard = await new Card(req.body);
-  NewCard.save((err) => {
-    if (err) return next(err);
-    return res
-      .status(201)
-      .send({ messages: 'Card added Succsessfully', Card: NewCard });
-  });
+	const NewCard = await new Card(req.body);
+	NewCard.save((err) => {
+		if (err) return next(err);
+		return res.status(201).send({ messages: 'Card added Succsessfully', Card: NewCard });
+	});
 };
 
 const getUserCards = async (req, res, next) => {
-  try {
-    const Cards = await Card.find({ owner: req.decToken.UserId });
-    return res.status(200).send({ messages: 'Retrived Successfully', Cards });
-  } catch (err) {
-    return next(err);
-  }
+	try {
+		const Cards = await Card.find({ owner: req.decToken.UserId });
+
+		return res.status(200).send({ messages: 'Retrived Successfully', Cards });
+	} catch (err) {
+		return next(err);
+	}
 };
 
 const DeleteCards = async (req, res, next) => {
-  try {
-    const DeletedCard = await Card.findOneAndDelete({ _id: req.params.id });
-    return res.status(200).send({ messages: 'Deleted Successfully' });
-  } catch (err) {
-    return next(err);
-  }
+	try {
+		const DeletedCard = await Card.findOneAndDelete({ _id: req.params.id });
+		if (!DeletedCard) throw new NotFoundException('Card is not found');
+		return res.status(200).send({ messages: 'Deleted Successfully' });
+	} catch (err) {
+		return next(err);
+	}
 };
 
 const UpdateCard = async (req, res, next) => {
-  try {
-    const UpdatedCard = await Card.findOneAndUpdate(
-      { _id: req.params.id },
-      req.body,
-      {
-        new: true,
-      }
-    );
-    return res
-      .status(200)
-      .send({ messages: 'Updated Successfully', UpdatedCard });
-  } catch (err) {
-    return next(err);
-  }
+	try {
+		const UpdatedCard = await Card.findOneAndUpdate({ _id: req.params.id }, req.body, {
+			new: true,
+		});
+		if (!UpdatedCard) throw new NotFoundException('Card is not found');
+		return res.status(200).send({ messages: 'Updated Successfully', UpdatedCard });
+	} catch (err) {
+		return next(err);
+	}
 };
 
 /* Address Controller */
 
-const CreateAddress = async (req, res, next) => {
-  let NewAdd = await new Address(req.body);
+const GetUsersAddress = async (req, res, next) => {
+	const exisitingUser = await User.findById(req.decToken.UserId).populate('addresses');
 
-  NewAdd.save(async (err) => {
-    if (err) return next(err);
-    console.log(NewAdd._id);
-    const UpdateUser = await User.findOneAndUpdate(
-      { _id: req.decToken.UserId },
-      { $addToSet: { addresses: NewAdd._id } },
-      { new: true }
-    );
-    return res
-      .status(201)
-      .send({ messages: 'Address Created Successfully', UpdateUser });
-  });
+	try {
+		if (!exisitingUser) throw new NotFoundException('User Is Not Found');
+		res.status(200).send({
+			message: 'Addresses Retrived Successfully',
+			sentObject: exisitingUser.addresses,
+		});
+	} catch (e) {
+		next(e);
+	}
+};
+
+const CreateAddress = async (req, res, next) => {
+	let NewAdd = await new Address(req.body);
+
+	NewAdd.save(async (err) => {
+		if (err) return next(err);
+		console.log(NewAdd._id);
+		const UpdateUser = await User.findOneAndUpdate(
+			{ _id: req.decToken.UserId },
+			{ $addToSet: { addresses: NewAdd._id } },
+			{ new: true },
+		);
+
+		if (!UpdateUser) throw new NotFoundException('User is not found');
+		return res.status(201).send({ messages: 'Address Created Successfully', UpdateUser });
+	});
 };
 
 const UpdateAddress = async (req, res, next) => {
-  try {
-    const UpdateAddress = await Address.findOneAndUpdate(
-      { _id: req.params.id },
-      req.body,
-      {
-        new: true,
-      }
-    );
-    return res
-      .status(200)
-      .send({ messages: 'Updated Successfully', UpdateAddress });
-  } catch (err) {
-    return next(err);
-  }
+	try {
+		const UpdateAddress = await Address.findOneAndUpdate(
+			{ _id: req.params.id, UserId: req.decToken.UserId },
+			req.body,
+			{
+				new: true,
+			},
+		);
+
+		if (!UpdateAddress) throw NotFoundException('Address is not found');
+		return res.status(200).send({ messages: 'Updated Successfully', UpdateAddress });
+	} catch (err) {
+		return next(err);
+	}
 };
 
 const DeleteAddress = async (req, res, next) => {
-  try {
-    const id = req.params.id;
-    const DeleteAddress = await Address.findOneAndDelete({ _id: id });
-    const UpdatedUser = await User.findOneAndUpdate(
-      { _id: req.decToken.UserId },
-      { $pull: { addresses: id } }
-    );
-    return res.status(200).send({
-      messages: 'Address Deleted Successfully',
-      UpdatedUser,
-      AddressId: id,
-    });
-  } catch (err) {
-    return next(err);
-  }
+	try {
+		const id = req.params.id;
+		const DeleteAddress = await Address.findOneAndDelete({
+			_id: id,
+			UserId: req.decToken.UserId,
+		});
+
+		if (DeleteAddress) throw NotFoundException('Address is not found');
+
+		return res.status(200).send({
+			messages: 'Address Deleted Successfully',
+			UpdatedUser,
+			AddressId: id,
+		});
+	} catch (err) {
+		return next(err);
+	}
 };
 
 /* Role */
 
-const CreateRole = async (req, res, next) => {
-  try {
-    const NewRole = await new Role(req.body);
-    NewRole.save((err) => {
-      if (err) return next(err);
-      return res
-        .status(200)
-        .send({ messages: 'Role Created Successfully', NewRole });
-    });
-  } catch (err) {
-    return next(err);
-  }
-};
+// const CreateRole = async (req, res, next) => {
+// 	try {
+// 		const NewRole = await new Role(req.body);
+// 		NewRole.save((err) => {
+// 			if (err) return next(err);
+// 			return res.status(200).send({ messages: 'Role Created Successfully', NewRole });
+// 		});
+// 	} catch (err) {
+// 		return next(err);
+// 	}
+// };
 
-const AddRole = async (req, res, next) => {
-  try {
-    const role = await Role.findOne({ _id: req.body.id });
-    const UpdateUser = await User.findByIdAndUpdate(req.decToken.UserId, {
-      role: role.name,
-    });
-    return res
-      .status(200)
-      .send({ messages: 'Role Added to User Successfully', UpdateUser });
-  } catch (err) {
-    return next(err);
-  }
-};
+// const AddRole = async (req, res, next) => {
+// 	try {
+// 		const role = await Role.findOne({ _id: req.body.id });
+// 		const UpdateUser = await User.findByIdAndUpdate(req.decToken.UserId, {
+// 			role: role.name,
+// 		});
+// 		return res.status(200).send({ messages: 'Role Added to User Successfully', UpdateUser });
+// 	} catch (err) {
+// 		return next(err);
+// 	}
+// };
 
-const UpdateRole = (req, res, next) => {
-  // Just Testing My knowleage in Using normal Promises In mongoose Queries
-  const UpdatedRole = Role.findByIdAndUpdate(
-    req.params.id,
-    { name: req.body.name },
-    { new: true }
-  )
-    .exec()
-    .then((d) => {
-      return res
-        .status(200)
-        .send({ messages: 'Role Updated Successfully', Role: d });
-    })
-    .catch((err) => next(err));
-};
+// const UpdateRole = (req, res, next) => {
+// 	// Just Testing My knowleage in Using normal Promises In mongoose Queries
+// 	const UpdatedRole = Role.findByIdAndUpdate(req.params.id, { name: req.body.name }, { new: true })
+// 		.exec()
+// 		.then((d) => {
+// 			return res.status(200).send({ messages: 'Role Updated Successfully', Role: d });
+// 		})
+// 		.catch((err) => next(err));
+// };
 
-const GetRoles = async (req, res, next) => {
-  try {
-    const roles = await Roles.find({});
-    return res
-      .status(200)
-      .send({ messages: 'Roles Fetched Successfully', Roles: roles });
-  } catch (err) {
-    return next(err);
-  }
-};
+// const GetRoles = async (req, res, next) => {
+// 	try {
+// 		const roles = await Roles.find({});
+// 		return res.status(200).send({ messages: 'Roles Fetched Successfully', Roles: roles });
+// 	} catch (err) {
+// 		return next(err);
+// 	}
+// };
 
-const DeleteRole = async (req, res, next) => {
-  try {
-    const DelRole = await Role.findOneAndDeleteOne({ _id: req.params.id });
-    const UpdateUser = await User.findOneAndUpdateOne(
-      { role: DelRole._id },
-      { role: null },
-      { new: true }
-    );
-    return res.status(200).send({
-      messages: 'Role Deleted Successfully',
-      RoleId: DelRole._id,
-      UpdateUser,
-    });
-  } catch (err) {
-    return next(err);
-  }
-};
+// const DeleteRole = async (req, res, next) => {
+// 	try {
+// 		const DelRole = await Role.findOneAndDeleteOne({ _id: req.params.id });
+// 		const UpdateUser = await User.findOneAndUpdateOne(
+// 			{ role: DelRole._id },
+// 			{ role: null },
+// 			{ new: true },
+// 		);
+// 		return res.status(200).send({
+// 			messages: 'Role Deleted Successfully',
+// 			RoleId: DelRole._id,
+// 			UpdateUser,
+// 		});
+// 	} catch (err) {
+// 		return next(err);
+// 	}
+// };
 
 /* Favourite  */
 
 const addToFavourite = async (req, res, next) => {
-  try {
-    const updatedFavourite = await Favourite.findOneAndUpdate(
-      { owner: req.decToken.UserId },
-      { $addToSet: { items: req.body.itemId } },
-      { new: true }
-    );
-    return res
-      .status(200)
-      .send({ messages: 'Updated Successfully', updatedFavourite });
-  } catch (err) {
-    return next(err);
-  }
+	try {
+		const updatedFavourite = await Favourite.findOneAndUpdate(
+			{ owner: req.decToken.UserId },
+			{ $addToSet: { items: req.query.id } },
+			{ new: true },
+		);
+		if (!updatedFavourite) throw new NotFoundException('User Favourite not found');
+		return res.status(200).send({ messages: 'Updated Successfully', updatedFavourite });
+	} catch (err) {
+		return next(err);
+	}
 };
 
 const deleteFromFavourite = async (req, res, next) => {
-  try {
-    const updateFavourite = await Favourite.updateOne(
-      { owner: req.decToken.UserId },
-      { $pull: { items: req.params.id } }
-    );
-    res.status(200).send({ messages: 'Deleted Successfully' });
-  } catch (err) {
-    return next(err);
-  }
+	try {
+		const updateFavourite = await Favourite.updateOne(
+			{ owner: req.decToken.UserId },
+			{ $pull: { items: req.params.id } },
+		);
+
+		if (!updateFavourite) throw new NotFoundException('User Favourite not found');
+		res.status(200).send({ messages: 'Deleted Successfully' });
+	} catch (err) {
+		return next(err);
+	}
 };
 
 /* Cart */
 
 const addToCart = async (req, res, next) => {
-  try {
-    const cart = await Cart.findOneAndUpdate(
-      { owner: req.decToken.UserId },
-      { $addToSet: { item: req.params.id } },
-      { new: true }
-    );
-    return res.status(200).send({ messages: 'Item Added Successfully' });
-  } catch (err) {
-    return next(err);
-  }
+	const { id } = req.params;
+	const { quantity } = req.body;
+	const { UserId } = req.decToken;
+	const session = conn.startSession();
+	try {
+		const orderLine = await orderLineModel({
+			item: id,
+			quantity: quantity || 1,
+			owner: UserId,
+			orderId: '',
+		});
+
+		await orderLine.save();
+		const cart = await Cart.findOneAndUpdate(
+			{ owner: req.decToken.UserId },
+			{ $addToSet: { item: orderLine._id } },
+			{ new: true },
+		);
+		(await session).commitTransaction();
+		if (!cart) throw new NotFoundException('User Cart is not found');
+		res.status(200).send({ messages: 'Item Added Successfully' });
+	} catch (err) {
+		next(err);
+		(await session).abortTransaction;
+	}
+	(await session).endSession();
 };
 
 const deleteFromCart = async (req, res, next) => {
-  try {
-    const cart = await Cart.findOneAndUpdate(
-      { owner: req.decToken.UserId },
-      { $pull: { item: req.params.id } },
-      { new: true }
-    );
-    return res.status(200).send({ messages: 'Item Deleted Successfully' });
-  } catch (err) {
-    return next(err);
-  }
+	const { id } = req.params;
+	const { quantity } = req.body;
+	const { UserId } = req.decToken;
+	const session = conn.startSession();
+
+	try {
+		const cart = await Cart.findOneAndUpdate(
+			{ owner: UserId },
+			{ $pull: { item: id } },
+			{ new: true },
+		);
+		const deleteOrder = await orderLineModel.findByIdAndDelete(req.params.id);
+
+		(await session).commitTransaction();
+
+		if (!cart) throw new NotFoundException('User Cart is not found');
+		if (!deleteOrder) throw new NotFoundException('OrderLine in not defiend');
+		res.status(200).send({ messages: 'Item Deleted Successfully' });
+	} catch (err) {
+		next(err);
+		(await session).abortTransaction;
+	}
+	(await session).endSession();
 };
 
 module.exports = {
-  User: {
-    signUp,
-    logIn,
-    DeleteUser,
-    UpdateUser,
-    UpdatePassword,
-  },
-  Cards: {
-    getUserCards,
-    createCards,
-    DeleteCards,
-    UpdateCard,
-  },
-  Address: {
-    CreateAddress,
-    DeleteAddress,
-    UpdateAddress,
-  },
-  Roles: {
-    GetRoles,
-    DeleteRole,
-    CreateRole,
-    UpdateRole,
-    AddRole,
-  },
-  Cart: {
-    addToCart,
-    deleteFromCart,
-  },
-  Favourite: {
-    addToFavourite,
-    deleteFromFavourite,
-  },
+	User: {
+		signUp,
+		logIn,
+		DeleteUser,
+		UpdateUser,
+		UpdatePassword,
+	},
+	Cards: {
+		getUserCards,
+		createCards,
+		DeleteCards,
+		UpdateCard,
+	},
+	Address: {
+		GetUsersAddress,
+		CreateAddress,
+		DeleteAddress,
+		UpdateAddress,
+	},
+	// Roles: {
+	// 	GetRoles,
+	// 	DeleteRole,
+	// 	CreateRole,
+	// 	UpdateRole,
+	// 	AddRole,
+	// },
+	Cart: {
+		addToCart,
+		deleteFromCart,
+	},
+	Favourite: {
+		addToFavourite,
+		deleteFromFavourite,
+	},
 };

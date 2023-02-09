@@ -1,8 +1,13 @@
 const OrderLine = require('../models/orderLine.model');
 const Order = require('../models/order.model');
 const SubItem = require('../models/subItem.model');
+const Cart = require('../models/cart.model');
+const conn = require('../middleware/mongo');
 
 const bwipjs = require('bwip-js');
+const OrderLineModel = require('../models/orderLine.model');
+const dotEnv = require('dotenv').config();
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 /* Order Line */
 
@@ -68,6 +73,7 @@ const bwipjs = require('bwip-js');
 
 const CreateOrder = async (req, res, next) => {
 	const { owner, status, address } = req.body;
+	const session = conn.startSession();
 	try {
 		const newOrder = await new Order({ owner, status, address });
 		bwipjs
@@ -87,65 +93,53 @@ const CreateOrder = async (req, res, next) => {
 		newOrder.barcode = barcode;
 		newOrder.barcodeText = `http://localhost:3000/order/${newOrder._id}`;
 
+		let amount = 0;
+
 		/* Creating OrderLines */
+		const orderLines = await Cart.findOne({ owner: req.decToken._id })
+			.populate({
+				path: 'items',
+				populate: { path: 'item' },
+			})
+			.exec().items;
 
-		const lineItems = [];
+		orderLines.forEach(async (el) => {
+			newOrder.ordreLines.push(el._id);
 
-		req.body.orderLines.forEach(async (el) => {
-			const newOrderLine = await new OrderLine(el);
-			// bwipjs
-			//   .toBuffer({
-			//     bcid: "code128", // Barcode type
-			//     text: `http://localhost:3000/order/${newOrderLine._id}`, // Text to encode
-			//     scale: 3, // 3x scaling factor
-			//     height: 10, // Bar height, in millimeters
-			//   })
-			//   .then((png) => {
-			//     const buffer = new Buffer(png).toString("base64");
-			//     barcode = buffer;
-			//   })
-			//   .catch((err) => {
-			//     next(err);
-			//   });
-			// newOrderLine.barcode = barcode;
-			// newOrderLine.barcodeText = `http://localhost:3000/order/${newOrderLine._id}`;
-			await newOrderLine.save();
-			await Order.updateOne(
-				{ _id: newOrder._id },
-				{ $addToSet: { orderLines: newOrderLine._id } },
-			);
+			const exisitingOrder = await OrderLineModel.findByIdAndUpdate(el._id, {
+				orderId: newOrder._id,
+			});
 
 			const updatedItem = await SubItem.findByIdAndUpdate(
 				{ _id: item },
-				{ $inc: { 'SubItem.count': -1 } },
+				{ $inc: { 'SubItem.count': -newOrderLine.quantity } },
 			);
-
-			const line_item = {
-				price_date: {
-					currency: 'usd',
-					product_data: {
-						id: updatedItem._id,
-						name: updatedItem.name,
-					},
-					unit_amount: updatedItem.price,
-				},
-				quantity: newOrderLine.quantity,
-			};
-			lineItems.push(line_item);
+			amount += updatedItem.price * newOrderLine.quantity;
 		});
 
-		const session = await stripe.checkout.sessions.create({
-			payment_method_types: ['card'],
-			line_items: lineItems,
-			mode: 'payment',
-		});
+		await newOrder.save();
 
-		return res
-			.status(201)
-			.send({ messages: 'Order Created Successfully', sentObject: session.id });
+		await session.commitTransaction();
+
+		stripe.charges.create(
+			{
+				amount,
+				currency: 'USD',
+				description: 'Payment',
+				source: req.body.token.id,
+			},
+			(err, charge) => {
+				if (err) next(err);
+				console.log(charge);
+				return res.status(201).send({ messages: 'Order Created Successfully' });
+			},
+		);
 	} catch (err) {
-		return next(err);
+		next(err);
+		await session.abortTransaction();
 	}
+
+	session.endSession();
 };
 
 const getOrders = async (req, res, next) => {
@@ -184,15 +178,18 @@ const getOrders = async (req, res, next) => {
 // };
 
 const deleteOrder = async (req, res, next) => {
+	const session = await conn.startSession();
 	try {
 		const Order = await Order.findeOneAndDelete({ owner: req.params.id });
-		for (let line of Order.ordreLines) {
-			await OrderLine.deleteOne({ _id: line });
-		}
-		return res.status(200).send({ messages: 'Orders Deleted Successfully' });
+		if (!Order) throw new NotFoundError(`Order ${req.params.id} is Not found`);
+		await OrderLine.deleteMany({ orderId: Order._id });
+		await session.commitTransaction();
+		res.status(200).send({ messages: 'Orders Deleted Successfully' });
 	} catch (err) {
-		return next(err);
+		await session.abortTransaction();
+		next(err);
 	}
+	session.endSession();
 };
 
 // const getOrderLines = (req, res, next) => {
