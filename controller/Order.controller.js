@@ -74,6 +74,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const CreateOrder = async (req, res, next) => {
 	const { owner, status, address } = req.body;
 	const session = conn.startSession();
+	(await session).startTransaction();
 	try {
 		const newOrder = await new Order({ owner, status, address });
 		bwipjs
@@ -179,6 +180,7 @@ const getOrders = async (req, res, next) => {
 
 const deleteOrder = async (req, res, next) => {
 	const session = await conn.startSession();
+	session.startTransaction();
 	try {
 		const Order = await Order.findeOneAndDelete({ owner: req.params.id });
 		if (!Order) throw new NotFoundError(`Order ${req.params.id} is Not found`);

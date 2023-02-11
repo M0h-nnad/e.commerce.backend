@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const SubItem = require('./subItem.model');
 
 const RatingSchema = new mongoose.Schema(
 	{
@@ -16,9 +15,12 @@ const RatingSchema = new mongoose.Schema(
 );
 
 RatingSchema.post('save', async (doc, next) => {
-	const existingSubItem = await SubItem.findByIdAndUpdate(doc.item);
+	const { SubItem } = require('./subItem.model');
+	const existingSubItem = await SubItem.findByIdAndUpdate(doc.item, {
+		$addToSet: { ratings: doc.id },
+	});
 	if (!existingSubItem) next(new Error('subitem not exisit'));
 
 	next();
 });
-module.exports = mongoose.model('Rating', RatingSchema);
+module.exports.Rating = mongoose.model('Rating', RatingSchema);

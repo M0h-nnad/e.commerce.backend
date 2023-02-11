@@ -15,9 +15,10 @@ app.use('/images', express.static(path.join(process.cwd(), '..', 'images')));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+app.use('/api', ItemsRouter);
+
 app.use('/api', UserRouter);
 
-app.use('/api', ItemsRouter);
 
 app.use(errorMiddleWare);
 

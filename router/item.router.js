@@ -68,6 +68,6 @@ router.post('/category', auth, controller.category.createCategory);
 router.post('/subcategory', auth, controller.subCategories.CreateSubCategory);
 router.post('/subcategorysub', auth, controller.subCategorySub.CreateSubCategorySub);
 // router.post('/favourite/:id', auth, controller.favourite.addToFavourite);
-router.post('/item/:id/rating', controller.rating.createRate);
+router.post('/rating/:id', controller.rating.createRate);
 
 module.exports = router;

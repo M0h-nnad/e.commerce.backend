@@ -14,6 +14,7 @@ const OrderLineSchema = new mongoose.Schema(
 			ref: 'User',
 		},
 		quantity: { type: Number, required: true },
+		variants: { type: mongoose.Types.ObjectId },
 		// operator: {
 		//   type: mongoose.Schema.Types.ObjectId,
 		//   required: true,

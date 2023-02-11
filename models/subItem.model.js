@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const Rating = require('./rating.model');
 // const FabricSchema = new mongoose.Schema({
 // 	cotton: Number,
 // 	polyester: Number,
@@ -36,8 +35,8 @@ const SubItemsSchema = new mongoose.Schema(
 		description: { type: String },
 
 		offer: { type: Number },
-		// rating: { type: Number, required: true, default: 0 },
 		ratings: { type: [mongoose.Schema.Types.ObjectId], ref: 'ratings' },
+		// rating: { type: Number, required: true, default: 0 },
 		// measure: { type: [String], required: true },
 		// color: { type: String, required: true },
 		// comments: [mongoose.Schema.Types.ObjectId],
@@ -54,10 +53,13 @@ const SubItemsSchema = new mongoose.Schema(
 	},
 );
 
+
 SubItemsSchema.pre('findOneAndDelete', async (doc, next) => {
+	const { Rating } = require('./rating.model');
+
 	const deleteRatings = await Rating.deleteMany({ item: doc._id });
 
 	next();
 });
 
-module.exports = mongoose.model('SubItem', SubItemsSchema);
+module.exports.SubItem = mongoose.model('SubItem', SubItemsSchema);

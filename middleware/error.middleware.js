@@ -25,7 +25,7 @@ const errorMiddleWare = (err, req, res, next) => {
 			}
 			break;
 		case 'NotFound':
-			return res.status(400).send({ message: err });
+			return res.status(400).send({ messages: err.message });
 			break;
 		default:
 			console.log(err);

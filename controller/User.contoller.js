@@ -6,7 +6,7 @@ const Card = require('../models/cards.model');
 const Role = require('../models/role.model');
 const Favourite = require('../models/favourite.model');
 const Cart = require('../models/cart.model');
-const NotFoundException = require('../shared/error');
+const NotFoundError = require('../shared/error');
 const conn = require('../middleware/mongo');
 /* Third Parties */
 
@@ -20,6 +20,8 @@ const signUp = async (req, res, next) => {
 	if (!email || !password) return res.status(400).send({ messages: 'Invalid Credentials' });
 	req.body.password = await bcrypt.hash(req.body.password, 12);
 	const session = await conn.startSession();
+	(await session).startTransaction();
+
 	try {
 		const newUser = await new User(req.body);
 
@@ -33,10 +35,12 @@ const signUp = async (req, res, next) => {
 
 		await newUser.save();
 		(await session).commitTransaction();
-		newUser.token = jwt.sign({ UserId: newUser._id, email: newUser.email }, Secret, {
+		const token = jwt.sign({ UserId: newUser._id, email: newUser.email }, Secret, {
 			expiresIn: '24h',
 		});
-		return res.status(201).send({ messages: 'User Created Successfully', UserDoc: newUser });
+		return res
+			.status(201)
+			.send({ messages: 'User Created Successfully', UserDoc: newUser, token });
 	} catch (err) {
 		(await session).abortTransaction();
 		next(err);
@@ -46,13 +50,12 @@ const signUp = async (req, res, next) => {
 
 const logIn = async (req, res, next) => {
 	let { email, password } = req.body;
-	let UserDoc = await User.findOne({ email }).populate('addresses').lean();
+	let UserDoc = await User.findOne({ email }).populate('addresses').exec();
 	if (UserDoc && (await bcrypt.compare(password, UserDoc.password))) {
-		UserDoc.token = jwt.sign({ UserId: UserDoc._id, email: UserDoc.email }, Secret, {
+		const token = jwt.sign({ UserId: UserDoc._id, email: UserDoc.email }, Secret, {
 			expiresIn: '24h',
 		});
-		delete UserDoc.password;
-		return res.status(200).send({ messages: 'Logged In SuccessFully', UserDoc });
+		return res.status(200).send({ messages: 'Logged In SuccessFully', UserDoc, token });
 	}
 	return res.status(404).send({ messages: 'Account Is not Found' });
 };
@@ -63,7 +66,7 @@ const UpdateUser = async (req, res, next) => {
 			new: true,
 		});
 
-		if (!UpdatedUser) throw new NotFoundException('User Is Not Found');
+		if (!UpdatedUser) throw new NotFoundError('User Is Not Found');
 
 		res.status(200).send({ messages: 'User Updated Successfully', UpdatedUser });
 	} catch (err) {
@@ -80,7 +83,7 @@ const UpdatePassword = async (req, res, next) => {
 			{ new: true },
 		);
 
-		if (!UpdatedUser) throw new NotFoundException('User is not found');
+		if (!UpdatedUser) throw new NotFoundError('User is not found');
 
 		return res.send(200).status({ messages: 'Password Updated Successfully' });
 	} catch (err) {
@@ -90,6 +93,8 @@ const UpdatePassword = async (req, res, next) => {
 
 const DeleteUser = async (req, res, next) => {
 	const session = await conn.startSession();
+	(await session).startTransaction();
+
 	try {
 		const DeleteUser = await User.findOneAndDelete({
 			_id: req.decToken.UserId,
@@ -105,7 +110,7 @@ const DeleteUser = async (req, res, next) => {
 		const cart = await Cart.deleteMany({ owner: doc._id });
 
 		await session.commitTransaction();
-		if (!DeleteUser) throw new NotFoundException('User is not found');
+		if (!DeleteUser) throw new NotFoundError('User is not found');
 
 		res.status(200).send({ messages: 'Deleted Successfully' });
 	} catch (err) {
@@ -140,7 +145,7 @@ const getUserCards = async (req, res, next) => {
 const DeleteCards = async (req, res, next) => {
 	try {
 		const DeletedCard = await Card.findOneAndDelete({ _id: req.params.id });
-		if (!DeletedCard) throw new NotFoundException('Card is not found');
+		if (!DeletedCard) throw new NotFoundError('Card is not found');
 		return res.status(200).send({ messages: 'Deleted Successfully' });
 	} catch (err) {
 		return next(err);
@@ -152,7 +157,7 @@ const UpdateCard = async (req, res, next) => {
 		const UpdatedCard = await Card.findOneAndUpdate({ _id: req.params.id }, req.body, {
 			new: true,
 		});
-		if (!UpdatedCard) throw new NotFoundException('Card is not found');
+		if (!UpdatedCard) throw new NotFoundError('Card is not found');
 		return res.status(200).send({ messages: 'Updated Successfully', UpdatedCard });
 	} catch (err) {
 		return next(err);
@@ -165,7 +170,7 @@ const GetUsersAddress = async (req, res, next) => {
 	const exisitingUser = await User.findById(req.decToken.UserId).populate('addresses');
 
 	try {
-		if (!exisitingUser) throw new NotFoundException('User Is Not Found');
+		if (!exisitingUser) throw new NotFoundError('User Is Not Found');
 		res.status(200).send({
 			message: 'Addresses Retrived Successfully',
 			sentObject: exisitingUser.addresses,
@@ -187,7 +192,7 @@ const CreateAddress = async (req, res, next) => {
 			{ new: true },
 		);
 
-		if (!UpdateUser) throw new NotFoundException('User is not found');
+		if (!UpdateUser) throw new NotFoundError('User is not found');
 		return res.status(201).send({ messages: 'Address Created Successfully', UpdateUser });
 	});
 };
@@ -202,7 +207,7 @@ const UpdateAddress = async (req, res, next) => {
 			},
 		);
 
-		if (!UpdateAddress) throw NotFoundException('Address is not found');
+		if (!UpdateAddress) throw NotFoundError('Address is not found');
 		return res.status(200).send({ messages: 'Updated Successfully', UpdateAddress });
 	} catch (err) {
 		return next(err);
@@ -217,7 +222,7 @@ const DeleteAddress = async (req, res, next) => {
 			UserId: req.decToken.UserId,
 		});
 
-		if (DeleteAddress) throw NotFoundException('Address is not found');
+		if (DeleteAddress) throw NotFoundError('Address is not found');
 
 		return res.status(200).send({
 			messages: 'Address Deleted Successfully',
@@ -301,7 +306,7 @@ const addToFavourite = async (req, res, next) => {
 			{ $addToSet: { items: req.query.id } },
 			{ new: true },
 		);
-		if (!updatedFavourite) throw new NotFoundException('User Favourite not found');
+		if (!updatedFavourite) throw new NotFoundError('User Favourite not found');
 		return res.status(200).send({ messages: 'Updated Successfully', updatedFavourite });
 	} catch (err) {
 		return next(err);
@@ -315,7 +320,7 @@ const deleteFromFavourite = async (req, res, next) => {
 			{ $pull: { items: req.params.id } },
 		);
 
-		if (!updateFavourite) throw new NotFoundException('User Favourite not found');
+		if (!updateFavourite) throw new NotFoundError('User Favourite not found');
 		res.status(200).send({ messages: 'Deleted Successfully' });
 	} catch (err) {
 		return next(err);
@@ -326,15 +331,17 @@ const deleteFromFavourite = async (req, res, next) => {
 
 const addToCart = async (req, res, next) => {
 	const { id } = req.params;
-	const { quantity } = req.body;
+	const { quantity, varaintId } = req.body;
 	const { UserId } = req.decToken;
 	const session = conn.startSession();
+	(await session).startTransaction();
+
 	try {
 		const orderLine = await orderLineModel({
 			item: id,
 			quantity: quantity || 1,
 			owner: UserId,
-			orderId: '',
+			variants: varaintId || '',
 		});
 
 		await orderLine.save();
@@ -344,7 +351,7 @@ const addToCart = async (req, res, next) => {
 			{ new: true },
 		);
 		(await session).commitTransaction();
-		if (!cart) throw new NotFoundException('User Cart is not found');
+		if (!cart) throw new NotFoundError('User Cart is not found');
 		res.status(200).send({ messages: 'Item Added Successfully' });
 	} catch (err) {
 		next(err);
@@ -358,7 +365,7 @@ const deleteFromCart = async (req, res, next) => {
 	const { quantity } = req.body;
 	const { UserId } = req.decToken;
 	const session = conn.startSession();
-
+	(await session).startTransaction();
 	try {
 		const cart = await Cart.findOneAndUpdate(
 			{ owner: UserId },
@@ -369,8 +376,8 @@ const deleteFromCart = async (req, res, next) => {
 
 		(await session).commitTransaction();
 
-		if (!cart) throw new NotFoundException('User Cart is not found');
-		if (!deleteOrder) throw new NotFoundException('OrderLine in not defiend');
+		if (!cart) throw new NotFoundError('User Cart is not found');
+		if (!deleteOrder) throw new NotFoundError('OrderLine in not defiend');
 		res.status(200).send({ messages: 'Item Deleted Successfully' });
 	} catch (err) {
 		next(err);

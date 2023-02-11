@@ -1,5 +1,5 @@
 const Item = require('../models/items.model');
-const SubItem = require('../models/subItem.model');
+const { SubItem } = require('../models/subItem.model');
 const Category = require('../models/category.model');
 const SubCategory = require('../models/subcategory.model');
 const SubCategorySub = require('../models/subcategorysub.model');
@@ -8,9 +8,8 @@ const Favourite = require('../models/favourite.model');
 const NotFoundException = require('../shared/error');
 
 const fs = require('fs');
-const Rate = require('../models/rating.model');
+const { Rating } = require('../models/rating.model');
 const conn = require('../middleware/mongo');
-const Mongoose = require('mongoose');
 
 /* Items */
 
@@ -222,9 +221,12 @@ const GetSubItem = async (req, res, next) => {
 /*Rating*/
 
 const createRate = async (req, res, next) => {
+	const { id } = req.params;
+	const { rate, name, email, title, body } = req.body;
 	try {
-		const newRate = new Rate(req.body);
+		const newRate = new Rating({ item: id, email, title, body, name, rate });
 		await newRate.save();
+		res.status(200).send({ messages: 'thank you for rating our product' });
 	} catch (e) {
 		next(e);
 	}
