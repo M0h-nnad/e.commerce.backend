@@ -64,7 +64,10 @@ const UpdateUser = async (req, res, next) => {
 	try {
 		const UpdatedUser = await User.findOneAndUpdate({ _id: req.decToken.UserId }, req.body, {
 			new: true,
+			runValidators: false,
 		});
+
+		console.log(req.decToken.UserId, req.decToken, UpdatedUser);
 
 		if (!UpdatedUser) throw new NotFoundError('User Is Not Found');
 
