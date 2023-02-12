@@ -13,6 +13,10 @@ const UserSchema = new mongoose.Schema(
 			required: [true, 'Gender Is Required'],
 			enum: { values: ['Male', 'female'], message: '{VALUE} is Not Supported' },
 		},
+		phone: {
+			type: String,
+			required: true,
+		},
 		// role: {
 		// 	type: mongoose.Schema.Types.ObjectId,
 		// 	required: [true, 'Role Is Required'],
@@ -94,6 +98,5 @@ user.create([
 		password: '$2a$12$ObUf/T47sJpF59fYkyswV.CCMQC0Cd8pWpIhoWnssg8Csgs35mczy',
 		enabled: true,
 	},
-])
+]);
 module.exports = user;
-

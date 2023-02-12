@@ -25,9 +25,9 @@ const signUp = async (req, res, next) => {
 	try {
 		const newUser = await new User(req.body);
 
-		const newCart = await new Cart({ owner: doc._id });
+		const newCart = await new Cart({ owner: newUser._id });
 		const newFavourite = await new Favourite({
-			owner: doc._id,
+			owner: newUser._id,
 		});
 
 		await newCart.save();
@@ -57,7 +57,7 @@ const logIn = async (req, res, next) => {
 		});
 		return res.status(200).send({ messages: 'Logged In SuccessFully', UserDoc, token });
 	}
-	return res.status(404).send({ messages: 'Account Is not Found' });
+	return res.status(404).send({ messages: 'Check your credential' });
 };
 
 const UpdateUser = async (req, res, next) => {
