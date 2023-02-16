@@ -6,7 +6,7 @@ const Card = require('../models/cards.model');
 const Role = require('../models/role.model');
 const Favourite = require('../models/favourite.model');
 const Cart = require('../models/cart.model');
-const NotFoundError = require('../shared/error');
+const { NotFoundError, ValidationError } = require('../shared/error');
 const conn = require('../middleware/mongo');
 /* Third Parties */
 
@@ -184,20 +184,29 @@ const GetUsersAddress = async (req, res, next) => {
 };
 
 const CreateAddress = async (req, res, next) => {
-	let NewAdd = await new Address(req.body);
+	const { UserId } = req.decToken;
+	const { type } = req.body;
+	try {
+		const user = await User.findById(UserId).populate('addresses').lean();
+		if (user.addresses.length > 2) {
+			throw new ValidationError('array must not be more than 2');
+		}
 
-	NewAdd.save(async (err) => {
-		if (err) return next(err);
-		console.log(NewAdd._id);
+		const index = user.addresses.findIndex((a) => a.type === type);
+		if (index > -1) throw new ValidationError(`${type} is created already you should update it`);
+		const NewAdd = await new Address({ ...req.body, userId: UserId });
+		await NewAdd.save();
 		const UpdateUser = await User.findOneAndUpdate(
-			{ _id: req.decToken.UserId },
+			{ _id: UserId },
 			{ $addToSet: { addresses: NewAdd._id } },
-			{ new: true },
+			{ new: true, runValidators: true },
 		);
 
 		if (!UpdateUser) throw new NotFoundError('User is not found');
-		return res.status(201).send({ messages: 'Address Created Successfully', UpdateUser });
-	});
+		res.status(201).send({ messages: 'Address Created Successfully' });
+	} catch (err) {
+		next(err);
+	}
 };
 
 const UpdateAddress = async (req, res, next) => {
@@ -210,10 +219,10 @@ const UpdateAddress = async (req, res, next) => {
 			},
 		);
 
-		if (!UpdateAddress) throw NotFoundError('Address is not found');
-		return res.status(200).send({ messages: 'Updated Successfully', UpdateAddress });
+		if (!UpdateAddress) throw NotFoundError('Address is not found in your account');
+		res.status(200).send({ messages: 'Updated Successfully', UpdateAddress });
 	} catch (err) {
-		return next(err);
+		next(err);
 	}
 };
 
@@ -225,15 +234,15 @@ const DeleteAddress = async (req, res, next) => {
 			UserId: req.decToken.UserId,
 		});
 
-		if (DeleteAddress) throw NotFoundError('Address is not found');
+		if (DeleteAddress) throw NotFoundError('Address is not found in your account');
 
-		return res.status(200).send({
+		res.status(200).send({
 			messages: 'Address Deleted Successfully',
 			UpdatedUser,
 			AddressId: id,
 		});
 	} catch (err) {
-		return next(err);
+		next(err);
 	}
 };
 

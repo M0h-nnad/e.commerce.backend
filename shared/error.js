@@ -5,4 +5,11 @@ class NotFoundError extends Error {
 	}
 }
 
-module.exports = NotFoundError;
+class ValidationError extends Error {
+	constructor(message) {
+		super(message);
+		this.name = 'CustomValidationError';
+	}
+}
+
+module.exports = { NotFoundError, ValidationError };

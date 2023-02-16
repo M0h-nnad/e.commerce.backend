@@ -4,6 +4,8 @@ const SubItem = require('../models/subItem.model');
 const Cart = require('../models/cart.model');
 const conn = require('../middleware/mongo');
 
+const { NotFoundError } = require('../shared/error');
+
 const bwipjs = require('bwip-js');
 const OrderLineModel = require('../models/orderLine.model');
 const dotEnv = require('dotenv').config();

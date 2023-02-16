@@ -24,6 +24,9 @@ const errorMiddleWare = (err, req, res, next) => {
 				return res.status(code).send({ messages: error, fields: fields });
 			}
 			break;
+		case 'CustomValidationError':
+			res.status(400).send({ messages: err.message });
+			break;
 		case 'NotFound':
 			return res.status(400).send({ messages: err.message });
 			break;
