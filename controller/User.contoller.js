@@ -78,17 +78,25 @@ const UpdateUser = async (req, res, next) => {
 };
 
 const UpdatePassword = async (req, res, next) => {
+	const { oldPassword, confirmNewPassword, newPassword } = req.body;
+	const { UserId } = req.decToken;
 	try {
-		const hashedPass = await bcrypt.hash(req.body.password, 12);
+		if (newPassword !== confirmNewPassword) throw new ValidationError('Password is not matched');
+		const exisitingUser = await User.findById(UserId);
+		if (!exisitingUser) throw new NotFoundError('User is not found');
+
+		const isTrue = await bcrypt.compare(oldPassword, exisitingUser.password);
+		if (!isTrue) throw new ValidationError(`old password doesn't Match`);
+
+		const hashedPass = await bcrypt.hash(newPassword, 12);
 		const UpdatedUser = await User.findOneAndUpdate(
-			{ _id: req.decToken.UserId },
+			{ _id: UserId },
 			{ password: hashedPass },
 			{ new: true },
 		);
 
-		if (!UpdatedUser) throw new NotFoundError('User is not found');
 
-		return res.send(200).status({ messages: 'Password Updated Successfully' });
+		return res.status(200).send({ messages: 'Password Updated Successfully' });
 	} catch (err) {
 		return next(err);
 	}

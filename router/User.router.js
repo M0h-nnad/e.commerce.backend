@@ -8,6 +8,7 @@ const router = express.Router();
 router.post('/login', UserController.User.logIn);
 router.post('/signup', UserController.User.signUp);
 
+router.put('/updatePassword', verfiyToken, UserController.User.UpdatePassword);
 router.put('/user', verfiyToken, UserController.User.UpdateUser);
 router.delete('/user', verfiyToken, UserController.User.DeleteUser);
 // Addressess
