@@ -25,6 +25,7 @@ const AddressSchema = new mongoose.Schema(
 		city: { type: String, required: [true, 'City Is Required'] },
 		postalCode: { type: Number, required: [true, 'Postal Code Is Required'] },
 		state: { type: String },
+		email: { type: String, trim: true, unique: true, required: true },
 		// timeZone: { type: String, required: [true, 'Time Zone Is Required'] },
 		latitude: { type: Number },
 		longitude: { type: Number },
@@ -33,7 +34,9 @@ const AddressSchema = new mongoose.Schema(
 		phone3: { type: Number },
 		userId: { type: mongoose.Schema.Types.ObjectId, required: true },
 	},
-	{ timestamps: true, id: true },
+	{
+		timestamps: true,
+	},
 );
 
 AddressSchema.pre('findOneAndDelete', async (doc, next) => {

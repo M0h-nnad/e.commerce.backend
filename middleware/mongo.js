@@ -23,6 +23,7 @@ mongoose.set('toJSON', {
 	transform: (doc, ret) => {
 		delete ret._id;
 		if (ret.password) delete ret.password;
+		if (ret.userId) delete ret.userId;
 		return ret;
 	},
 });
