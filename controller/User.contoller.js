@@ -321,7 +321,9 @@ const DeleteAddress = async (req, res, next) => {
 const getFavourite = async (req, res, next) => {
 	const { UserId } = req.decToken;
 	try {
-		const exisitingFavourite = await Favourite.findOne({ owner: UserId }).populate('items').exec();
+		const exisitingFavourite = await Favourite.findOne({ owner: UserId })
+			.populate('items')
+			.exec();
 
 		res.status(200).send({ messages: 'Operation done', sentObject: exisitingFavourite });
 	} catch (e) {
@@ -367,22 +369,28 @@ const addToCart = async (req, res, next) => {
 	(await session).startTransaction();
 
 	try {
+		const existingOrderLine = await orderLineModel.findOne({
+			item: id,
+			owner: UserId,
+			variants: varaintId,
+		});
+		if (existingOrderLine) throw new ValidationError('Item Already in the cart');
 		const orderLine = await orderLineModel({
 			item: id,
 			quantity: quantity || 1,
 			owner: UserId,
-			variants: varaintId || '',
+			variants: varaintId,
 		});
 
 		await orderLine.save();
 		const cart = await Cart.findOneAndUpdate(
 			{ owner: req.decToken.UserId },
-			{ $addToSet: { item: orderLine._id } },
+			{ $addToSet: { items: orderLine._id } },
 			{ new: true },
-		);
+		).populate('items');
 		(await session).commitTransaction();
 		if (!cart) throw new NotFoundError('User Cart is not found');
-		res.status(200).send({ messages: 'Item Added Successfully' });
+		res.status(200).send({ messages: 'Item Added Successfully', sentObject: cart });
 	} catch (err) {
 		next(err);
 		(await session).abortTransaction;

@@ -142,6 +142,14 @@ const GetSubItemsQuery = async (pageSize, currentPage, brand, color, size) => {
 
 	const SubItems = await SubItem.aggregate([
 		{
+			$lookup: {
+				from: Rating.collection.name,
+				localField: 'ratings',
+				foreignField: '_id',
+				as: 'ratingsObj',
+			},
+		},
+		{
 			$match: {
 				$and: [query],
 			},
@@ -162,15 +170,16 @@ const GetSubItemsQuery = async (pageSize, currentPage, brand, color, size) => {
 								7,
 							],
 						},
-						then: 'false',
-						else: 'true',
+						then: 'true',
+						else: '$$REMOVE',
 					},
 				},
+				rate: { $avg: '$ratingsObj.rate' },
 				id: '$_id',
 			},
 		},
 		{
-			$unset: ['_id', '__v'],
+			$unset: ['_id', '__v', 'ratings', 'ratingsObj', 'tags'],
 		},
 	])
 		.skip(pageSize * (currentPage - 1))
@@ -188,7 +197,6 @@ const GetSubItems = async (req, res, next) => {
 		const currentPage = +req.query.currentPage || 1;
 		let { brands, colors, sizes } = req.query;
 
-		console.log(brands, colors, sizes);
 		brands === 'null' ? (brands = JSON.parse(brands)) : '';
 		colors === 'null' ? (colors = JSON.parse(colors)) : '';
 		sizes === 'null' ? (sizes = JSON.parse(sizes)) : '';
@@ -204,6 +212,7 @@ const GetSubItems = async (req, res, next) => {
 			pages: existingSubItems.pages,
 		});
 	} catch (err) {
+		console.log(err);
 		next(err);
 	}
 };
