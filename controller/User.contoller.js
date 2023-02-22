@@ -95,7 +95,6 @@ const UpdatePassword = async (req, res, next) => {
 			{ new: true },
 		);
 
-
 		return res.status(200).send({ messages: 'Password Updated Successfully' });
 	} catch (err) {
 		return next(err);
@@ -319,15 +318,26 @@ const DeleteAddress = async (req, res, next) => {
 
 /* Favourite  */
 
+const getFavourite = async (req, res, next) => {
+	const { UserId } = req.decToken;
+	try {
+		const exisitingFavourite = await Favourite.findOne({ owner: UserId }).populate('items').exec();
+
+		res.status(200).send({ messages: 'Operation done', sentObject: exisitingFavourite });
+	} catch (e) {
+		next(e);
+	}
+};
+
 const addToFavourite = async (req, res, next) => {
 	try {
 		const updatedFavourite = await Favourite.findOneAndUpdate(
 			{ owner: req.decToken.UserId },
-			{ $addToSet: { items: req.query.id } },
+			{ $addToSet: { items: req.params.id } },
 			{ new: true },
 		);
 		if (!updatedFavourite) throw new NotFoundError('User Favourite not found');
-		return res.status(200).send({ messages: 'Updated Successfully', updatedFavourite });
+		return res.status(200).send({ messages: 'Updated Successfully' });
 	} catch (err) {
 		return next(err);
 	}
@@ -440,5 +450,6 @@ module.exports = {
 	Favourite: {
 		addToFavourite,
 		deleteFromFavourite,
+		getFavourite,
 	},
 };

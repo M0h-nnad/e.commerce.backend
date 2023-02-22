@@ -23,8 +23,9 @@ router.get('/cards', verfiyToken, UserController.Cards.getUserCards);
 router.post('/cards', verfiyToken, UserController.Cards.createCards);
 
 // favourite
-router.post('/favorite/:id', verfiyToken, UserController.Favourite.addToFavourite);
-router.delete('/favorite/:id', verfiyToken, UserController.Favourite.deleteFromFavourite);
+router.get('/favourite', verfiyToken, UserController.Favourite.getFavourite);
+router.post('/favourite/:id', verfiyToken, UserController.Favourite.addToFavourite);
+router.delete('/favourite/:id', verfiyToken, UserController.Favourite.deleteFromFavourite);
 
 // cart
 
