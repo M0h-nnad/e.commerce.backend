@@ -373,7 +373,6 @@ const getCartItems = async (req, res, next) => {
 		// 		select:'variants'
 		// 	},
 		// });
-		console.log(`UserId:${UserId}`);
 
 		const cart = await Cart.aggregate([
 			{
@@ -408,7 +407,7 @@ const getCartItems = async (req, res, next) => {
 			},
 			{
 				$group: {
-					_id: '$items._id',
+					_id: '$items',
 					item: { $first: '$item' },
 					variant: {
 						$first: {
@@ -429,7 +428,7 @@ const getCartItems = async (req, res, next) => {
 			},
 			{
 				$group: {
-					_id: '$item._id',
+					_id: '$sizeId',
 					item: { $first: '$item' },
 					variant: { $first: '$variant' },
 					size: {
@@ -456,6 +455,7 @@ const getCartItems = async (req, res, next) => {
 					'variant.color': 1,
 					'variant.src': 1,
 					size: 1,
+					quantity: 1,
 				},
 			},
 		]);
