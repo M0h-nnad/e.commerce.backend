@@ -33,7 +33,6 @@ const SubItemsSchema = new mongoose.Schema(
 		tags: { type: [String] },
 		onsale: Boolean,
 		description: { type: String },
-
 		offer: { type: Number },
 		ratings: { type: [mongoose.Schema.Types.ObjectId], ref: 'ratings' },
 		// rating: { type: Number, required: true, default: 0 },

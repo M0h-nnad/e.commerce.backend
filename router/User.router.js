@@ -28,7 +28,7 @@ router.post('/favourite/:id', verfiyToken, UserController.Favourite.addToFavouri
 router.delete('/favourite/:id', verfiyToken, UserController.Favourite.deleteFromFavourite);
 
 // cart
-
+router.get('/cart', verfiyToken, UserController.Cart.getCartItems);
 router.post('/cart/:id', verfiyToken, UserController.Cart.addToCart);
 router.delete('/cart/:id', verfiyToken, UserController.Cart.deleteFromCart);
 

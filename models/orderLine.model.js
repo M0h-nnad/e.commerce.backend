@@ -15,6 +15,7 @@ const OrderLineSchema = new mongoose.Schema(
 		},
 		quantity: { type: Number, required: true },
 		variants: { type: mongoose.Types.ObjectId },
+		sizeId: { type: mongoose.Types.ObjectId },
 		// operator: {
 		//   type: mongoose.Schema.Types.ObjectId,
 		//   required: true,

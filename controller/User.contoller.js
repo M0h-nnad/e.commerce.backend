@@ -8,11 +8,13 @@ const Favourite = require('../models/favourite.model');
 const Cart = require('../models/cart.model');
 const { NotFoundError, ValidationError } = require('../shared/error');
 const conn = require('../middleware/mongo');
+const mongoose = require('mongoose');
 /* Third Parties */
 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const orderLineModel = require('../models/orderLine.model');
+const { SubItem } = require('../models/subItem.model');
 const { Secret } = process.env;
 
 const signUp = async (req, res, next) => {
@@ -361,9 +363,112 @@ const deleteFromFavourite = async (req, res, next) => {
 
 /* Cart */
 
+const getCartItems = async (req, res, next) => {
+	const { UserId } = req.decToken;
+	try {
+		// const cart = await Cart.find({ owner: UserId }).select('items').populate({
+		// 	path: 'items',
+		// 	populate: {
+		// 		path: 'item',
+		// 		select:'variants'
+		// 	},
+		// });
+		console.log(`UserId:${UserId}`);
+
+		const cart = await Cart.aggregate([
+			{
+				$match: {
+					owner: mongoose.Types.ObjectId(UserId),
+				},
+			},
+			{
+				$unwind: '$items',
+			},
+			{
+				$lookup: {
+					from: orderLineModel.collection.name,
+					localField: 'items',
+					foreignField: '_id',
+					as: 'items',
+				},
+			},
+			{
+				$lookup: {
+					from: SubItem.collection.name,
+					localField: 'items.item',
+					foreignField: '_id',
+					as: 'item',
+				},
+			},
+			{
+				$unwind: '$item',
+			},
+			{
+				$unwind: '$items',
+			},
+			{
+				$group: {
+					_id: '$items._id',
+					item: { $first: '$item' },
+					variant: {
+						$first: {
+							$filter: {
+								input: '$item.variants',
+								cond: { $eq: ['$$this._id', '$items.variants'] },
+							},
+						},
+					},
+					sizeId: {
+						$first: '$items.sizeId',
+					},
+					quantity: { $first: '$items.quantity' },
+				},
+			},
+			{
+				$unwind: '$variant',
+			},
+			{
+				$group: {
+					_id: '$item._id',
+					item: { $first: '$item' },
+					variant: { $first: '$variant' },
+					size: {
+						$first: {
+							$filter: {
+								input: '$variant.sizes',
+								cond: { $eq: ['$$this._id', '$sizeId'] },
+							},
+						},
+					},
+					quantity: { $first: '$quantity' },
+				},
+			},
+			{
+				$unwind: '$size',
+			},
+			{
+				$project: {
+					'item.name': 1,
+					'item.price': 1,
+					'item.offer': 1,
+					'item._id': 1,
+					'variant._id': 1,
+					'variant.color': 1,
+					'variant.src': 1,
+					size: 1,
+				},
+			},
+		]);
+
+		res.status(200).send({ message: 'operation successfully', sentObject: cart });
+	} catch (e) {
+		next(e);
+	}
+};
+
 const addToCart = async (req, res, next) => {
 	const { id } = req.params;
-	const { quantity, varaintId } = req.body;
+	const { quantity, varaintId, sizeId } = req.body;
 	const { UserId } = req.decToken;
 	const session = conn.startSession();
 	(await session).startTransaction();
@@ -373,6 +478,7 @@ const addToCart = async (req, res, next) => {
 			item: id,
 			owner: UserId,
 			variants: varaintId,
+			sizeId: sizeId,
 		});
 		if (existingOrderLine) throw new ValidationError('Item Already in the cart');
 		const orderLine = await orderLineModel({
@@ -380,6 +486,7 @@ const addToCart = async (req, res, next) => {
 			quantity: quantity || 1,
 			owner: UserId,
 			variants: varaintId,
+			sizeId: sizeId,
 		});
 
 		await orderLine.save();
@@ -453,6 +560,7 @@ module.exports = {
 	// },
 	Cart: {
 		addToCart,
+		getCartItems,
 		deleteFromCart,
 	},
 	Favourite: {

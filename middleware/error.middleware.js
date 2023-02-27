@@ -1,13 +1,5 @@
 const errorMiddleWare = (err, req, res, next) => {
 	switch (err.name) {
-		case 'MongoServerError':
-			if (err.code === 11000) {
-				const field = Object.keys(err.keyValue);
-				const code = 409;
-				const error = `This Value Of ${field} Is Taken`;
-				res.status(code).send({ messages: error, fields: field });
-				break;
-			}
 		case 'CastError':
 			const castError = new Error(`Invalid ${err.path}: ${err.value}`);
 			return res.status(400).send({ messages: castError });
@@ -30,6 +22,15 @@ const errorMiddleWare = (err, req, res, next) => {
 		case 'NotFound':
 			return res.status(400).send({ messages: err.message });
 			break;
+		case 'MongoServerError':
+			console.log(err);
+			if (err.code === 11000) {
+				const field = Object.keys(err.keyValue);
+				const code = 409;
+				const error = `This Value Of ${field} Is Taken`;
+				res.status(code).send({ messages: error, fields: field });
+				break;
+			}
 		default:
 			console.log(err);
 			res.status(500).send({ messages: 'An Unknown Error Occurred' });
