@@ -30,6 +30,7 @@ router.delete('/favourite/:id', verfiyToken, UserController.Favourite.deleteFrom
 // cart
 router.get('/cart', verfiyToken, UserController.Cart.getCartItems);
 router.post('/cart/:id', verfiyToken, UserController.Cart.addToCart);
+router.put('/cart/:id', verfiyToken, UserController.Cart.updateQuantity);
 router.delete('/cart/:id', verfiyToken, UserController.Cart.deleteFromCart);
 
 module.exports = router;

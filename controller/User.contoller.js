@@ -46,8 +46,9 @@ const signUp = async (req, res, next) => {
 	} catch (err) {
 		(await session).abortTransaction();
 		next(err);
+	} finally {
+		await session.endSession();
 	}
-	session.endSession();
 };
 
 const logIn = async (req, res, next) => {
@@ -128,8 +129,9 @@ const DeleteUser = async (req, res, next) => {
 	} catch (err) {
 		next(err);
 		await session.abortTransaction();
+	} finally {
+		session.endSession();
 	}
-	session.endSession();
 };
 
 const restPassword = async (req, res, next) => {};
@@ -388,13 +390,13 @@ const getCartItems = async (req, res, next) => {
 					from: orderLineModel.collection.name,
 					localField: 'items',
 					foreignField: '_id',
-					as: 'items',
+					as: 'itemsObj',
 				},
 			},
 			{
 				$lookup: {
 					from: SubItem.collection.name,
-					localField: 'items.item',
+					localField: 'itemsObj.item',
 					foreignField: '_id',
 					as: 'item',
 				},
@@ -403,24 +405,25 @@ const getCartItems = async (req, res, next) => {
 				$unwind: '$item',
 			},
 			{
-				$unwind: '$items',
+				$unwind: '$itemsObj',
 			},
 			{
 				$group: {
-					_id: '$items',
+					_id: '$itemsObj',
 					item: { $first: '$item' },
 					variant: {
 						$first: {
 							$filter: {
 								input: '$item.variants',
-								cond: { $eq: ['$$this._id', '$items.variants'] },
+								cond: { $eq: ['$$this._id', '$itemsObj.variants'] },
 							},
 						},
 					},
+					orderId: { $first: '$items' },
 					sizeId: {
-						$first: '$items.sizeId',
+						$first: '$itemsObj.sizeId',
 					},
-					quantity: { $first: '$items.quantity' },
+					quantity: { $first: '$itemsObj.quantity' },
 				},
 			},
 			{
@@ -439,6 +442,7 @@ const getCartItems = async (req, res, next) => {
 							},
 						},
 					},
+					orderId: { $first: '$orderId' },
 					quantity: { $first: '$quantity' },
 				},
 			},
@@ -456,6 +460,7 @@ const getCartItems = async (req, res, next) => {
 					'variant.src': 1,
 					size: 1,
 					quantity: 1,
+					orderId: 1,
 				},
 			},
 		]);
@@ -501,13 +506,13 @@ const addToCart = async (req, res, next) => {
 	} catch (err) {
 		next(err);
 		(await session).abortTransaction;
+	} finally {
+		(await session).endSession();
 	}
-	(await session).endSession();
 };
 
 const deleteFromCart = async (req, res, next) => {
 	const { id } = req.params;
-	const { quantity } = req.body;
 	const { UserId } = req.decToken;
 	const session = conn.startSession();
 	(await session).startTransaction();
@@ -517,7 +522,7 @@ const deleteFromCart = async (req, res, next) => {
 			{ $pull: { item: id } },
 			{ new: true },
 		);
-		const deleteOrder = await orderLineModel.findByIdAndDelete(req.params.id);
+		const deleteOrder = await orderLineModel.findByIdAndDelete(id);
 
 		(await session).commitTransaction();
 
@@ -527,8 +532,31 @@ const deleteFromCart = async (req, res, next) => {
 	} catch (err) {
 		next(err);
 		(await session).abortTransaction;
+	} finally {
+		(await session).endSession();
 	}
-	(await session).endSession();
+};
+
+const updateQuantity = async (req, res, next) => {
+	const { id } = req.params;
+	const { UserId } = req.decToken;
+	const { quantity } = req.body;
+
+	try {
+		const existingOrderLine = await orderLineModel.findOneAndUpdate(
+			{ _id: id, owner: UserId },
+			{
+				quantity,
+			},
+			{ new: true },
+		);
+
+		if (!existingOrderLine) throw new NotFoundError(`Order #${id} not found`);
+
+		res.status(200).send({ message: 'Updated Successfully' });
+	} catch (err) {
+		next(err);
+	}
 };
 
 module.exports = {
@@ -562,6 +590,7 @@ module.exports = {
 		addToCart,
 		getCartItems,
 		deleteFromCart,
+		updateQuantity,
 	},
 	Favourite: {
 		addToFavourite,
