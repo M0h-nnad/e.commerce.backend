@@ -11,7 +11,8 @@ const OrderLineModel = require('../models/orderLine.model');
 const Cart = require('../models/cart.model');
 const dotEnv = require('dotenv').config();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-
+const transactionModel = require('../models/transactions.model');
+const userModel = require('../models/User.model');
 /* Order Line */
 
 // const addOrderLine = async (req, res, next) => {
@@ -82,9 +83,9 @@ const CreateOrder = async (req, res, next) => {
 
 	try {
 		const cart = await userController.Cart.getCartItemsAggregateFunction(UserId, session);
-		const addresses = await Address.find({ userId: UserId }).session(session);
-
-		if (addresses.length < 2)
+		const user = await userModel.findById(UserId).populate('addresses').session(session);
+		// const addresses = await Address.find({ userId: UserId }).session(session);
+		if (user.addresses.length < 2)
 			throw new ValidationError('please add your addresses before placing order');
 		if (cart.length === 0) throw new ValidationError('your cart is empty');
 		const amount = cart.reduce((total, obj) => {
@@ -144,7 +145,33 @@ const CreateOrder = async (req, res, next) => {
 			source: token.id,
 		});
 
-		cart.items = [];
+		console
+
+		const transaction = new transactionModel({
+			orderId: order.id,
+			customerInfo: {
+				firstName: user.firstName,
+				lastName: user.lastName,
+				gender: user.gender,
+				phone: user.phone,
+				email: user.email,
+				enabled: user.enabled,
+				addresses: user.addresses,
+			},
+			productInfo: cart,
+			paymentInfo: {
+				method: 'stripe',
+				amount: amount,
+				transactionId: charges.id,
+			},
+			shippingInfo: {
+				method: 'Company shipping method',
+				cost: 10,
+			},
+			discountInfo: 0,
+		});
+
+		await transaction.save({ session });
 
 		await Cart.findOneAndUpdate({ owner: UserId }, { $set: { items: [] } });
 
@@ -207,7 +234,12 @@ const CreateOrder = async (req, res, next) => {
 		// 	// default:
 		// }
 
-		res.status(200).json({ messages: 'Order placed successfully', sentObject: order._id });
+		res.status(200).json({
+			messages: 'Order placed successfully',
+			sentObject: order._id,
+			charges,
+			transaction,
+		});
 	} catch (err) {
 		console.log(err);
 		await session.abortTransaction();

@@ -43,6 +43,7 @@ const errorMiddleWare = (err, req, res, next) => {
 	} else {
 		res.status(500).send({ messages: 'An Unknown Error Occurred' });
 	}
+	console.log(err);
 };
 
 module.exports = errorMiddleWare;

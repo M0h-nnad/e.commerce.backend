@@ -487,7 +487,9 @@ const addToCart = async (req, res, next) => {
 			.session(session);
 
 		if (existingOrderLine) throw new ValidationError('Item Already in the cart');
-		const existingOrder = await Order.findOne({ owner: UserId });
+		const existingOrder = await Order.findOne({ owner: UserId, status: 'pending' });
+
+
 		let order;
 		if (!existingOrder) {
 			order = new Order({
@@ -496,6 +498,8 @@ const addToCart = async (req, res, next) => {
 				orderLines: [],
 			});
 			await order.save({ session });
+		} else {
+			order = existingOrder;
 		}
 
 		const orderLine = await new orderLineModel({
@@ -504,12 +508,12 @@ const addToCart = async (req, res, next) => {
 			owner: UserId,
 			variants: varaintId,
 			sizeId: sizeId,
-			orderId: order?._id ?? existingOrder._id,
+			orderId: order._id,
 		});
 
 		await orderLine.save({ session });
-		existingOrder.orderLines.push(orderLine._id);
-		existingOrder.save({ session });
+		order.orderLines.push(orderLine._id);
+		order.save({ session });
 		const cart = await Cart.findOneAndUpdate(
 			{ owner: req.decToken.UserId },
 			{ $addToSet: { items: orderLine._id } },
@@ -540,6 +544,8 @@ const deleteFromCart = async (req, res, next) => {
 		).session(session);
 
 		const deleteOrder = await orderLineModel.findByIdAndDelete(id).session(session);
+
+		console.log(deleteOrder);
 
 		const order = await Order.findOneAndUpdate(
 			{ owner: UserId },

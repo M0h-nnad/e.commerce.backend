@@ -35,8 +35,8 @@ const orderSchema = new mongoose.Schema(
 						city: { type: String, required: true },
 						postalCode: { type: Number, required: true },
 						state: { type: String, required: true },
-						phone2: { type: Number, required: true },
-						userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+						phone2: { type: Number },
+						userId: { type: mongoose.Schema.Types.ObjectId },
 						createdAt: { type: Date, required: true },
 						updatedAt: { type: Date, required: true },
 					},
@@ -45,29 +45,25 @@ const orderSchema = new mongoose.Schema(
 		},
 		productInfo: [
 			{
-				productId: {
-					type: String,
-					required: true,
+				_id: { type: String, required: true },
+				item: {
+					_id: { type: String, required: true },
+					name: { type: String, required: true },
+					offer: { type: Number, required: true },
+					price: { type: Number, required: true },
 				},
-				name: {
-					type: String,
-					required: true,
+				variant: {
+					_id: { type: String, required: true },
+					color: { type: String, required: true },
+					src: { type: String, required: true },
 				},
-				quantity: {
-					type: Number,
-					required: true,
+				size: {
+					_id: { type: String, required: true },
+					number: { type: Number, required: true },
+					size: { type: String, required: true },
 				},
-				price: {
-					type: Number,
-					required: true,
-				},
-				variations: [
-					{
-						size: String,
-						color: String,
-						_id: false,
-					},
-				],
+				orderId: { type: String, required: true },
+				quantity: { type: Number, required: true },
 			},
 		],
 		paymentInfo: {
@@ -101,6 +97,6 @@ const orderSchema = new mongoose.Schema(
 	{ timestamps: true, strict: true },
 );
 
-const Order = mongoose.model('Order', orderSchema);
+const transaction = mongoose.model('transaction', orderSchema);
 
-module.exports = Order;
+module.exports = transaction;
