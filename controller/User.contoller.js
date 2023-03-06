@@ -3,7 +3,7 @@
 const User = require('../models/User.model');
 const Address = require('../models/addresses.model');
 const Card = require('../models/cards.model');
-const Role = require('../models/role.model');
+const Order = require('../models/order.model');
 const Favourite = require('../models/favourite.model');
 const Cart = require('../models/cart.model');
 const { NotFoundError, ValidationError } = require('../shared/error');
@@ -21,7 +21,7 @@ const signUp = async (req, res, next) => {
 	const { email, password, role } = req.body;
 	if (!email || !password) return res.status(400).send({ messages: 'Invalid Credentials' });
 	req.body.password = await bcrypt.hash(req.body.password, 12);
-	const session = await conn.startSession();
+	const session = await mongoose.startSession();
 	(await session).startTransaction();
 
 	try {
@@ -32,10 +32,10 @@ const signUp = async (req, res, next) => {
 			owner: newUser._id,
 		});
 
-		await newCart.save();
-		await newFavourite.save();
+		await newCart.save({ session });
+		await newFavourite.save({ session });
 
-		await newUser.save();
+		await newUser.save({ session });
 		(await session).commitTransaction();
 		const token = jwt.sign({ UserId: newUser._id, email: newUser.email }, Secret, {
 			expiresIn: '24h',
@@ -363,107 +363,105 @@ const deleteFromFavourite = async (req, res, next) => {
 	}
 };
 
+const getCartItemsAggregateFunction = async (userId, session = null) => {
+	const cart = await Cart.aggregate([
+		{
+			$match: {
+				owner: mongoose.Types.ObjectId(userId),
+			},
+		},
+		{
+			$unwind: '$items',
+		},
+		{
+			$lookup: {
+				from: orderLineModel.collection.name,
+				localField: 'items',
+				foreignField: '_id',
+				as: 'itemsObj',
+			},
+		},
+		{
+			$lookup: {
+				from: SubItem.collection.name,
+				localField: 'itemsObj.item',
+				foreignField: '_id',
+				as: 'item',
+			},
+		},
+		{
+			$unwind: '$item',
+		},
+		{
+			$unwind: '$itemsObj',
+		},
+		{
+			$group: {
+				_id: '$itemsObj',
+				item: { $first: '$item' },
+				variant: {
+					$first: {
+						$filter: {
+							input: '$item.variants',
+							cond: { $eq: ['$$this._id', '$itemsObj.variants'] },
+						},
+					},
+				},
+				orderId: { $first: '$itemsObj.orderId' },
+				sizeId: {
+					$first: '$itemsObj.sizeId',
+				},
+				quantity: { $first: '$itemsObj.quantity' },
+			},
+		},
+		{
+			$unwind: '$variant',
+		},
+		{
+			$group: {
+				_id: '$sizeId',
+				item: { $first: '$item' },
+				variant: { $first: '$variant' },
+				size: {
+					$first: {
+						$filter: {
+							input: '$variant.sizes',
+							cond: { $eq: ['$$this._id', '$sizeId'] },
+						},
+					},
+				},
+				orderId: { $first: '$orderId' },
+				quantity: { $first: '$quantity' },
+			},
+		},
+		{
+			$unwind: '$size',
+		},
+		{
+			$project: {
+				'item.name': 1,
+				'item.price': 1,
+				'item.offer': 1,
+				'item._id': 1,
+				'variant._id': 1,
+				'variant.color': 1,
+				'variant.src': 1,
+				size: 1,
+				quantity: 1,
+				orderId: 1,
+			},
+		},
+	]).session(session);
+
+	return cart;
+};
+
 /* Cart */
 
 const getCartItems = async (req, res, next) => {
 	const { UserId } = req.decToken;
 	try {
-		// const cart = await Cart.find({ owner: UserId }).select('items').populate({
-		// 	path: 'items',
-		// 	populate: {
-		// 		path: 'item',
-		// 		select:'variants'
-		// 	},
-		// });
-
-		const cart = await Cart.aggregate([
-			{
-				$match: {
-					owner: mongoose.Types.ObjectId(UserId),
-				},
-			},
-			{
-				$unwind: '$items',
-			},
-			{
-				$lookup: {
-					from: orderLineModel.collection.name,
-					localField: 'items',
-					foreignField: '_id',
-					as: 'itemsObj',
-				},
-			},
-			{
-				$lookup: {
-					from: SubItem.collection.name,
-					localField: 'itemsObj.item',
-					foreignField: '_id',
-					as: 'item',
-				},
-			},
-			{
-				$unwind: '$item',
-			},
-			{
-				$unwind: '$itemsObj',
-			},
-			{
-				$group: {
-					_id: '$itemsObj',
-					item: { $first: '$item' },
-					variant: {
-						$first: {
-							$filter: {
-								input: '$item.variants',
-								cond: { $eq: ['$$this._id', '$itemsObj.variants'] },
-							},
-						},
-					},
-					orderId: { $first: '$items' },
-					sizeId: {
-						$first: '$itemsObj.sizeId',
-					},
-					quantity: { $first: '$itemsObj.quantity' },
-				},
-			},
-			{
-				$unwind: '$variant',
-			},
-			{
-				$group: {
-					_id: '$sizeId',
-					item: { $first: '$item' },
-					variant: { $first: '$variant' },
-					size: {
-						$first: {
-							$filter: {
-								input: '$variant.sizes',
-								cond: { $eq: ['$$this._id', '$sizeId'] },
-							},
-						},
-					},
-					orderId: { $first: '$orderId' },
-					quantity: { $first: '$quantity' },
-				},
-			},
-			{
-				$unwind: '$size',
-			},
-			{
-				$project: {
-					'item.name': 1,
-					'item.price': 1,
-					'item.offer': 1,
-					'item._id': 1,
-					'variant._id': 1,
-					'variant.color': 1,
-					'variant.src': 1,
-					size: 1,
-					quantity: 1,
-					orderId: 1,
-				},
-			},
-		]);
+		const cart = await getCartItemsAggregateFunction(UserId, null);
 
 		res.status(200).send({ message: 'operation successfully', sentObject: cart });
 	} catch (e) {
@@ -475,34 +473,52 @@ const addToCart = async (req, res, next) => {
 	const { id } = req.params;
 	const { quantity, varaintId, sizeId } = req.body;
 	const { UserId } = req.decToken;
-	const session = conn.startSession();
-	(await session).startTransaction();
+	const session = await conn.startSession();
+	await session.startTransaction();
 
 	try {
-		const existingOrderLine = await orderLineModel.findOne({
-			item: id,
-			owner: UserId,
-			variants: varaintId,
-			sizeId: sizeId,
-		});
+		const existingOrderLine = await orderLineModel
+			.findOne({
+				item: id,
+				owner: UserId,
+				variants: varaintId,
+				sizeId: sizeId,
+			})
+			.session(session);
+
 		if (existingOrderLine) throw new ValidationError('Item Already in the cart');
-		const orderLine = await orderLineModel({
+		const existingOrder = await Order.findOne({ owner: UserId });
+		let order;
+		if (!existingOrder) {
+			order = new Order({
+				owner: UserId,
+				status: 'pending',
+				orderLines: [],
+			});
+			await order.save({ session });
+		}
+
+		const orderLine = await new orderLineModel({
 			item: id,
 			quantity: quantity || 1,
 			owner: UserId,
 			variants: varaintId,
 			sizeId: sizeId,
+			orderId: order?._id ?? existingOrder._id,
 		});
 
-		await orderLine.save();
+		await orderLine.save({ session });
+		existingOrder.orderLines.push(orderLine._id);
+		existingOrder.save({ session });
 		const cart = await Cart.findOneAndUpdate(
 			{ owner: req.decToken.UserId },
 			{ $addToSet: { items: orderLine._id } },
 			{ new: true },
-		).populate('items');
-		(await session).commitTransaction();
+		).session(session);
+
+		await session.commitTransaction();
 		if (!cart) throw new NotFoundError('User Cart is not found');
-		res.status(200).send({ messages: 'Item Added Successfully', sentObject: cart });
+		res.status(200).send({ messages: 'Item Added Successfully' });
 	} catch (err) {
 		next(err);
 		(await session).abortTransaction;
@@ -514,26 +530,35 @@ const addToCart = async (req, res, next) => {
 const deleteFromCart = async (req, res, next) => {
 	const { id } = req.params;
 	const { UserId } = req.decToken;
-	const session = conn.startSession();
-	(await session).startTransaction();
+	const session = await conn.startSession();
+	await session.startTransaction();
 	try {
 		const cart = await Cart.findOneAndUpdate(
 			{ owner: UserId },
 			{ $pull: { item: id } },
 			{ new: true },
-		);
-		const deleteOrder = await orderLineModel.findByIdAndDelete(id);
+		).session(session);
 
-		(await session).commitTransaction();
+		const deleteOrder = await orderLineModel.findByIdAndDelete(id).session(session);
+
+		const order = await Order.findOneAndUpdate(
+			{ owner: UserId },
+			{ $pull: { orderLines: id } },
+			{ new: true },
+		);
+
+		await session.commitTransaction();
 
 		if (!cart) throw new NotFoundError('User Cart is not found');
 		if (!deleteOrder) throw new NotFoundError('OrderLine in not defiend');
+		if (!order) throw new NotFoundError('Order in not defiend');
+
 		res.status(200).send({ messages: 'Item Deleted Successfully' });
 	} catch (err) {
 		next(err);
-		(await session).abortTransaction;
+		await session.abortTransaction;
 	} finally {
-		(await session).endSession();
+		await session.endSession();
 	}
 };
 
@@ -591,6 +616,7 @@ module.exports = {
 		getCartItems,
 		deleteFromCart,
 		updateQuantity,
+		getCartItemsAggregateFunction,
 	},
 	Favourite: {
 		addToFavourite,

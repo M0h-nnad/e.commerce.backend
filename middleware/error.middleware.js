@@ -1,4 +1,5 @@
 const errorMiddleWare = (err, req, res, next) => {
+	console.log(err);
 	switch (err.name) {
 		case 'CastError':
 			const castError = new Error(`Invalid ${err.path}: ${err.value}`);
@@ -32,7 +33,6 @@ const errorMiddleWare = (err, req, res, next) => {
 				break;
 			}
 		default:
-			console.log(err);
 			res.status(500).send({ messages: 'An Unknown Error Occurred' });
 	}
 };

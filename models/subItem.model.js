@@ -21,7 +21,7 @@ const SubItemsSchema = new mongoose.Schema(
 						type: [
 							{
 								size: String,
-								number: Number,
+								number: { type: Number, min: 0 },
 							},
 						],
 					},

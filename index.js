@@ -5,6 +5,7 @@ const bodyParser = require('body-parser');
 const app = express();
 const UserRouter = require('./router/User.router');
 const ItemsRouter = require('./router/item.router');
+const OrderRouter = require('./router/order.router');
 const errorMiddleWare = require('./middleware/error.middleware');
 const path = require('path');
 
@@ -18,7 +19,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use('/api', ItemsRouter);
 
 app.use('/api', UserRouter);
-
+app.use('/api', OrderRouter);
 
 app.use(errorMiddleWare);
 

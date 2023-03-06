@@ -17,11 +17,6 @@ const UserSchema = new mongoose.Schema(
 			type: String,
 			required: true,
 		},
-		// role: {
-		// 	type: mongoose.Schema.Types.ObjectId,
-		// 	required: [true, 'Role Is Required'],
-		// 	ref: 'Role',
-		// },
 		email: {
 			type: String,
 			required: [true, 'Email Is Required'],
@@ -34,11 +29,7 @@ const UserSchema = new mongoose.Schema(
 		addresses: {
 			type: [mongoose.Schema.Types.ObjectId],
 			ref: 'Address',
-			// validate: v => Array.isArray(v) && v.length > 0,
-			// message:'error '
 		},
-		// operatorOrders: { type: [mongoose.Schema.Types.ObjectId], ref: "Orders" },
-		// orderNumbers:{type:Number,max:5}
 	},
 	{
 		timestamps: true,

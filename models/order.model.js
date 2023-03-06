@@ -8,21 +8,20 @@ const OrderSchema = new mongoose.Schema(
 			ref: 'User',
 		},
 		status: { type: String, required: true },
-		barcode: { type: Buffer, contentType: String, required: true },
-		barcodeText: { type: String, required: true },
+		barcode: { type: Buffer, contentType: String },
+		barcodeText: { type: String },
 		address: {
 			type: mongoose.Schema.Types.ObjectId,
-			required: true,
 			ref: 'Addresses',
 		},
+		orderLines: { type: [mongoose.Schema.Types.ObjectId] },
 		// addressAudit: {
 		//   type: mongoose.Schema.Types.ObjectId,
 		//   required: true,
 		//   ref: "AddressesAudit",
 		// },
-		ordreLines: { type: [mongoose.Schema.Types.ObjectId] },
 	},
 	{ timestamps: true },
 );
 
-module.exports = mongoose.exports('Order', OrderSchema, 'Orders');
+module.exports = mongoose.model('Order', OrderSchema, 'Orders');

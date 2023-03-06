@@ -5,6 +5,7 @@ mongoose
 		useNewUrlParser: true,
 		useUnifiedTopology: true,
 		ignoreUndefined: true,
+		dbName:'ecommerce'
 	})
 	.then(() => {
 		console.log('connected to db');
@@ -14,12 +15,14 @@ mongoose
 	});
 const conn = mongoose.connection;
 
+mongoose.Promise = global.Promise;
+
+
 mongoose.set('strict', true);
 mongoose.set('toJSON', {
 	getters: true,
 	virtuals: true,
 	id: true,
-	versionKey: false,
 	transform: (doc, ret) => {
 		delete ret._id;
 		if (ret.password) delete ret.password;
@@ -31,11 +34,11 @@ mongoose.set('toObject', {
 	getters: true,
 	virtuals: true,
 	id: true,
-	versionKey: false,
 	transform: (doc, ret) => {
 		delete ret._id;
 		return ret;
 	},
 });
+
 
 module.exports = conn;

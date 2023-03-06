@@ -1,13 +1,14 @@
 const OrderLine = require('../models/orderLine.model');
 const Order = require('../models/order.model');
-const SubItem = require('../models/subItem.model');
-const Cart = require('../models/cart.model');
+const { SubItem } = require('../models/subItem.model');
+const userController = require('../controller/User.contoller');
 const conn = require('../middleware/mongo');
-
-const { NotFoundError } = require('../shared/error');
+const Address = require('../models/addresses.model');
+const { NotFoundError, ValidationError } = require('../shared/error');
 
 const bwipjs = require('bwip-js');
 const OrderLineModel = require('../models/orderLine.model');
+const Cart = require('../models/cart.model');
 const dotEnv = require('dotenv').config();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
@@ -74,75 +75,146 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 // };
 
 const CreateOrder = async (req, res, next) => {
-	const { owner, status, address } = req.body;
-	const session = conn.startSession();
-	(await session).startTransaction();
+	const { owner, status, address, payment, token } = req.body;
+	const { UserId } = req.decToken;
+	const session = await conn.startSession();
+	await session.startTransaction();
+
 	try {
-		const newOrder = await new Order({ owner, status, address });
-		bwipjs
-			.toBuffer({
-				bcid: 'code128', // Barcode type
-				text: `http://localhost:3000/order/${newOrder._id}`, // Text to encode
-				scale: 3, // 3x scaling factor
-				height: 10, // Bar height, in millimeters
-			})
-			.then((png) => {
-				const buffer = new Buffer(png).toString('base64');
-				barcode = buffer;
-			})
-			.catch((err) => {
-				next(err);
-			});
-		newOrder.barcode = barcode;
-		newOrder.barcodeText = `http://localhost:3000/order/${newOrder._id}`;
+		const cart = await userController.Cart.getCartItemsAggregateFunction(UserId, session);
+		const addresses = await Address.find({ userId: UserId }).session(session);
 
-		let amount = 0;
+		if (addresses.length < 2)
+			throw new ValidationError('please add your addresses before placing order');
+		if (cart.length === 0) throw new ValidationError('your cart is empty');
+		const amount = cart.reduce((total, obj) => {
+			const itemPrice = obj.item.price - obj.item.offer;
+			return total + itemPrice * obj.quantity;
+		}, 0);
+		const promises = cart.map(async (el) => {
+			const subItem = await SubItem.findOneAndUpdate(
+				{
+					_id: el.item.id,
+					variants: {
+						$elemMatch: {
+							_id: el.variant._id,
+							sizes: {
+								$elemMatch: {
+									_id: el.size._id,
+									number: { $gte: el.quantity },
+								},
+							},
+						},
+					},
+				},
+				{
+					$inc: { 'variants.$[i].sizes.$[j].number': -el.quantity },
+				},
+				{
+					arrayFilters: [{ 'i._id': el.variant._id }, { 'j._id': el.size._id }],
+					new: true,
+					useFindAndModify: false,
+					session: session,
+				},
+			).lean();
 
-		/* Creating OrderLines */
-		const orderLines = await Cart.findOne({ owner: req.decToken._id })
-			.populate({
-				path: 'items',
-				populate: { path: 'item' },
-			})
-			.exec().items;
-
-		orderLines.forEach(async (el) => {
-			newOrder.ordreLines.push(el._id);
-
-			const exisitingOrder = await OrderLineModel.findByIdAndUpdate(el._id, {
-				orderId: newOrder._id,
-			});
-
-			const updatedItem = await SubItem.findByIdAndUpdate(
-				{ _id: item },
-				{ $inc: { 'SubItem.count': -newOrderLine.quantity } },
-			);
-			amount += updatedItem.price * newOrderLine.quantity;
+			if (subItem) {
+				return;
+			} else {
+				throw new ValidationError(`item ${el.item.name} size ${el.size.size} is out of stock`);
+			}
 		});
 
-		await newOrder.save();
+		await Promise.all(promises);
+
+		const order = await Order.findByIdAndUpdate(
+			cart[0].orderId,
+			{
+				$set: { status: 'processing' },
+			},
+			{ new: true },
+		).session(session);
+
+		if (!order) throw new ValidationError('Order is not found');
+
+		const charges = await stripe.charges.create({
+			amount,
+			currency: 'USD',
+			description: 'Payment',
+			source: token.id,
+		});
+
+		cart.items = [];
+
+		await Cart.findOneAndUpdate({ owner: UserId }, { $set: { items: [] } });
 
 		await session.commitTransaction();
 
-		stripe.charges.create(
-			{
-				amount,
-				currency: 'USD',
-				description: 'Payment',
-				source: req.body.token.id,
-			},
-			(err, charge) => {
-				if (err) next(err);
-				console.log(charge);
-				return res.status(201).send({ messages: 'Order Created Successfully' });
-			},
-		);
-	} catch (err) {
-		next(err);
-		await session.abortTransaction();
-	}
+		// await newOrder.save();
 
-	session.endSession();
+		// switch (payment) {
+		// 	case 'stripe':
+
+		// 		break;
+		// 	// case 'paypal':
+		// 	// 	const payment = {
+		// 	// 		intent: 'sale',
+		// 	// 		payer: {
+		// 	// 			payment_method: 'paypal',
+		// 	// 		},
+		// 	// 		redirect_urls: {
+		// 	// 			return_url: '<YOUR_RETURN_URL>',
+		// 	// 			cancel_url: '<YOUR_CANCEL_URL>',
+		// 	// 		},
+		// 	// 		transactions: [
+		// 	// 			{
+		// 	// 				item_list: {
+		// 	// 					items: [
+		// 	// 						{
+		// 	// 							name: description,
+		// 	// 							price: amount,
+		// 	// 							currency: 'USD',
+		// 	// 							quantity: 1,
+		// 	// 						},
+		// 	// 					],
+		// 	// 				},
+		// 	// 				amount: {
+		// 	// 					currency: 'USD',
+		// 	// 					total: amount,
+		// 	// 				},
+		// 	// 				description: description,
+		// 	// 			},
+		// 	// 		],
+		// 	// 	};
+
+		// 	// 	// create PayPal payment
+		// 	// 	paypal.payment.create(payment, (error, payment) => {
+		// 	// 		if (error) {
+		// 	// 			console.log(error);
+		// 	// 			res.status(500).json({
+		// 	// 				message: 'An error occurred while processing your payment.',
+		// 	// 			});
+		// 	// 		} else {
+		// 	// 			// redirect to PayPal payment approval URL
+		// 	// 			// const approvalUrl = payment.links.find(
+		// 	// 			// 	(link) => link.rel === 'approval_url',
+		// 	// 			// ).href;
+		// 	// 			res.status(200).json({ messages: 'Order placed successfully' });
+		// 	// 		}
+		// 	// 	});
+
+		// 	// 	break;
+		// 	// default:
+		// }
+
+		res.status(200).json({ messages: 'Order placed successfully', sentObject: order._id });
+	} catch (err) {
+		console.log(err);
+		await session.abortTransaction();
+		next(err);
+	} finally {
+		session.endSession();
+	}
 };
 
 const getOrders = async (req, res, next) => {
@@ -219,3 +291,22 @@ module.exports = {
 	//   DeleteOrderLine,
 	// },
 };
+
+/* 
+			const subItem = await SubItem.findOneAndUpdate(
+				{
+					_id: el.item.id,
+					'variants._id': el.variant._id,
+					'variant.sizes._id': el.size._id,
+					'variants.sizes.$.number': { $gte: el.quantity },
+				},
+				{
+					$inc: { 'variants$[i].sizes.$[j].number': -el.quantity },
+				},
+				{
+					arrayFilters: [{ 'i._id': el.variant._id }, { 'j._id': el.size._id }],
+					new: true,
+				},
+			).session(session);
+
+*/
