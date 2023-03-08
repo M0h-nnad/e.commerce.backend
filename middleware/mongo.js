@@ -5,7 +5,8 @@ mongoose
 		useNewUrlParser: true,
 		useUnifiedTopology: true,
 		ignoreUndefined: true,
-		dbName:'ecommerce'
+		dbName: 'ecommerce',
+		replicaSet: 'rs',
 	})
 	.then(() => {
 		console.log('connected to db');
@@ -16,7 +17,6 @@ mongoose
 const conn = mongoose.connection;
 
 mongoose.Promise = global.Promise;
-
 
 mongoose.set('strict', true);
 mongoose.set('toJSON', {
@@ -39,6 +39,5 @@ mongoose.set('toObject', {
 		return ret;
 	},
 });
-
 
 module.exports = conn;

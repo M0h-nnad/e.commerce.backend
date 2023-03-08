@@ -27,19 +27,19 @@ const errorMiddleWare = (err, req, res, next) => {
 		}
 	} else if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
 		// Handle JSON parse error
-		res.status(400).send({ message: 'Invalid JSON data' });
+		res.status(400).send({ messages: 'Invalid JSON data' });
 	} else if (err instanceof TypeError) {
 		// Handle type error
-		res.status(400).send({ message: 'Invalid data type' });
+		res.status(400).send({ messages: 'Invalid data type' });
 	} else if (err instanceof RangeError) {
 		// Handle range error
-		res.status(400).send({ message: 'Invalid data range' });
+		res.status(400).send({ messages: 'Invalid data range' });
 	} else if (err instanceof ReferenceError) {
 		// Handle reference error
-		res.status(500).send({ message: 'Internal server error' });
+		res.status(500).send({ messages: 'Internal server error' });
 	} else if (err instanceof Error && err.name === 'ValidationError') {
 		// Handle validation error
-		res.status(400).send({ message: err.message });
+		res.status(400).send({ messages: err.message });
 	} else {
 		res.status(500).send({ messages: 'An Unknown Error Occurred' });
 	}
