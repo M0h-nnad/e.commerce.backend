@@ -145,7 +145,7 @@ const CreateOrder = async (req, res, next) => {
 			source: token.id,
 		});
 
-		console
+		console;
 
 		const transaction = new transactionModel({
 			orderId: order.id,
@@ -251,13 +251,13 @@ const CreateOrder = async (req, res, next) => {
 
 const getOrders = async (req, res, next) => {
 	try {
-		const pageSize = +req.query.pageSize;
-		const currentPage = +req.query.currentPage;
+		const pageSize = +req.query.pageSize || 10;
+		const currentPage = +req.query.currentPage || 1;
 		const orderId = req.params.id;
 		const userId = req.decToken.UserId;
 		if (pageSize && currentPage) {
-			const Orders = await Order.find({})
-				.populate('ordreLines')
+			const Orders = await Order.find({ owner: userId })
+				.select('id status')
 				.skip(pageSize * (currentPage - 1))
 				.limit(pageSize);
 			return res.status(200).send({ messages: 'Orders Fetched Successfully', Orders });
